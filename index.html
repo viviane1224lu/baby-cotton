@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#fbf6ee">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="小棉花">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>小棉花的冒險日記</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&family=Caveat:wght@600;700&display=swap">
+<style>
+/* Layout: every screen is one of the user's watercolor paintings shown whole on a 16:9 stage (letterboxed on paper); tap spots sit invisibly on the painted objects; UI floats as soft paper chips. Single daylight picture-book look in every theme. */
+:root{
+  --paper:#fbf6ee;
+  --ink:#5e4a3e;
+  --pencil:#9a7b66;
+  --accent:#e98fa3;
+  --accent-dk:#c76c82;
+  --leaf:#7fa86d;
+  --f-zh:"Huninn","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-en:"Caveat","Huninn",cursive;
+  color-scheme:light;
+}
+:root[data-kid="boy"]{--accent:#6fa6d6;--accent-dk:#4f82b0}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-zh);overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:4px solid var(--accent);outline-offset:3px}
+#app{position:relative;height:100%;overflow:hidden;background:var(--paper)}
+#stage{position:absolute;overflow:hidden;border-radius:6px;box-shadow:0 10px 40px rgba(94,74,62,.18)}
+#bg{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;transition:filter 1.2s}
+#stage.night #bg{filter:brightness(.68) saturate(.85) sepia(.15) hue-rotate(-10deg)}
+
+/* painted objects you can tap */
+.spot{position:absolute;z-index:3;border-radius:18px}
+.spot.debug{outline:3px dashed rgba(255,0,90,.8);background:rgba(255,0,90,.12)}
+.spot.found::after{content:"✿";position:absolute;right:-6px;top:-10px;color:#fff;font-size:22px;text-shadow:0 0 6px var(--accent),0 0 2px var(--accent)}
+.ping{position:absolute;z-index:4;border-radius:50%;pointer-events:none;border:4px solid #fff;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 45%,transparent),0 0 30px #fff;animation:ping .9s ease-out forwards}
+@keyframes ping{from{transform:scale(.5);opacity:1}to{transform:scale(1.25);opacity:0}}
+.nudge{position:absolute;z-index:4;border-radius:50%;pointer-events:none;border:4px dashed #fff;box-shadow:0 0 24px #fff;animation:nudge 1.1s ease-in-out infinite}
+@keyframes nudge{50%{transform:scale(1.12) rotate(15deg)}}
+
+/* characters painted by the user, cut from their sheets */
+.char{position:absolute;z-index:2;transform:translateX(-50%);cursor:pointer;filter:drop-shadow(0 8px 6px rgba(94,74,62,.18));animation:breathe 2.8s ease-in-out infinite;transition:opacity .5s}
+.char.hop{animation:hop .5s ease-in-out 3}
+@keyframes breathe{50%{translate:0 -1.2%}}
+@keyframes hop{50%{translate:0 -8%}}
+
+/* top bar */
+.top{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:flex-start;gap:10px;pointer-events:none;
+  padding-top:10px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.top>*{pointer-events:auto}
+.chip{background:rgba(255,252,246,.94);border:2px dashed #dcc3b0;border-radius:999px;box-shadow:0 6px 16px rgba(94,74,62,.14)}
+#me{display:flex;align-items:center;gap:8px;padding:4px 16px 4px 4px}
+#me .av{width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:22px}
+#me b{display:block;font-size:19px;line-height:1.1}
+#me small{font-size:13px;color:var(--pencil)}
+.iconbtn{width:52px;height:52px;display:grid;place-items:center;font-size:24px}
+.spacer{flex:1}
+#path{display:flex;gap:4px;padding:5px 8px}
+#path span{font-size:14px;padding:4px 10px;border-radius:999px;color:var(--pencil);white-space:nowrap}
+#path span.done{color:#5d7f4d;background:#e5f0dc}
+#path span.now{color:#fff;background:var(--accent)}
+#path span.lock{opacity:.55}
+#lvBadge{font-size:14px;padding:6px 12px;white-space:nowrap;color:var(--ink)}
+#lvBadge b{color:#c2410c}
+
+/* narration */
+.say{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:5;pointer-events:none;max-width:min(860px,calc(100% - 120px));
+  background:rgba(255,252,246,.94);border:2px dashed #dcc3b0;border-radius:18px;padding:16px 22px 10px;font-size:clamp(17px,3.2vmin,26px);line-height:1.4;box-shadow:0 8px 24px rgba(94,74,62,.15)}
+.who[data-who="旁白"]{background:#a48d7c}.who[data-who="媽媽"]{background:#e98fa3}
+.who{position:absolute;top:-15px;left:18px;background:var(--leaf);color:#fff;border-radius:999px;padding:1px 14px;font-size:clamp(13px,2.4vmin,17px)}
+#replay{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:12px;z-index:6;width:58px;height:58px;font-size:26px;display:grid;place-items:center}
+
+/* word card */
+#card{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:rgba(94,74,62,.25)}
+#card .in{background:#fffdf8;border-radius:14px;padding:16px 26px 18px;text-align:center;box-shadow:0 16px 40px rgba(94,74,62,.3);border:2px dashed #e7cdbb;
+  transform:rotate(-1.5deg);animation:cardIn .45s cubic-bezier(.3,1.6,.5,1);max-width:86vw}
+@keyframes cardIn{from{scale:.4;opacity:0}}
+#card img{display:block;margin:0 auto 8px;max-height:min(34vh,240px);max-width:min(70vw,360px);border-radius:10px}
+#card .zy{font-size:clamp(14px,2.6vmin,19px);letter-spacing:.3em;color:var(--pencil);min-height:1em}
+#card .zh{font-size:clamp(40px,8.5vmin,66px);line-height:1.05}
+#card .en{font-family:var(--f-en);font-weight:700;font-size:clamp(32px,6.5vmin,50px);color:var(--accent);line-height:1}
+
+/* big buttons + overlays */
+.go{background:var(--accent);color:#fff;font-size:clamp(20px,4vmin,30px);padding:10px 34px;border-radius:999px;box-shadow:0 6px 0 var(--accent-dk)}
+.go:active{transform:translateY(4px);box-shadow:0 2px 0 var(--accent-dk)}
+.go[disabled]{opacity:.5}
+#next{position:absolute;left:50%;bottom:clamp(90px,18vh,130px);transform:translateX(-50%);z-index:7;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{scale:1.07}}
+[hidden]{display:none!important}
+.overlay{position:absolute;inset:0;z-index:9;display:grid;place-items:center;text-align:center;background:rgba(251,246,238,.9);overflow:auto;
+  padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.panel{background:#fffdf8;border-radius:18px;padding:20px 26px 24px;box-shadow:0 16px 40px rgba(94,74,62,.2);border:2px dashed #e7cdbb;width:min(100%,640px);box-sizing:border-box;min-width:0}
+@media (max-width:480px){.panel{padding:16px 12px 20px}}
+.panel h2{font-weight:400;font-size:clamp(28px,6vmin,44px);margin:0 0 6px;color:var(--ink)}
+.panel .sub{color:var(--pencil);margin-bottom:12px}
+.panel img.hero{height:clamp(110px,24vmin,180px);display:block;margin:0 auto 4px}
+.form{display:grid;gap:8px;justify-items:center;margin:6px 0 16px;font-size:clamp(17px,3.2vmin,22px)}
+.form input{font:inherit;font-size:24px;text-align:center;width:min(80vw,320px);padding:8px 18px;border-radius:999px;border:2px dashed #dcc3b0;background:#fff;color:var(--ink)}
+.form input:focus{outline:3px solid var(--accent);outline-offset:2px}
+.form .q{margin-top:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.pick{background:#fff;border:2px dashed #dcc3b0;border-radius:999px;padding:6px 18px;font-size:20px;min-width:64px}
+.pick[aria-pressed="true"]{background:var(--accent);color:#fff;border:2px solid var(--accent)}
+.pick.boy[aria-pressed="true"]{background:#6fa6d6;border-color:#6fa6d6}
+.pick.girl[aria-pressed="true"]{background:#e98fa3;border-color:#e98fa3}
+.voices{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 8px;align-items:center;width:min(86vw,460px);font-size:17px}
+.voices select{font:inherit;font-size:16px;padding:6px 10px;border-radius:12px;border:2px dashed #dcc3b0;background:#fff;color:var(--ink);min-width:0}
+.voices .pick{font-size:16px;padding:4px 14px;min-width:0}
+.vrow{display:grid;grid-template-columns:3.2em minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;width:min(90vw,520px);font-size:17px}
+.vrow b{font-weight:400}
+.vrow select{font:inherit;font-size:15px;padding:5px 6px;border-radius:10px;border:2px dashed #dcc3b0;background:#fff;color:var(--ink);min-width:0}
+.vrow .pick{font-size:15px;padding:4px 12px;min-width:0}
+#packs{flex-direction:column;align-items:center}
+.paintc{position:absolute;inset:0;width:100%;height:100%;z-index:3;touch-action:none;cursor:crosshair}
+.paintc.mult{mix-blend-mode:multiply}
+#stage.paperbg{background:#fffdf8}
+#sayBox.top{top:64px;bottom:auto}
+#paintBar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:7;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;
+  background:rgba(255,252,246,.96);border:2px dashed #dcc3b0;border-radius:22px;padding:8px 10px;max-width:calc(100% - 24px);box-shadow:0 8px 20px rgba(94,74,62,.15)}
+#paintBar .gap{width:6px}
+.sw{width:clamp(28px,5vmin,40px);height:clamp(28px,5vmin,40px);border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px #dcc3b0}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 4px var(--ink);transform:scale(1.12)}
+.tool{min-width:clamp(32px,5.4vmin,44px);height:clamp(32px,5.4vmin,44px);border-radius:14px;background:#fff;border:2px solid #e7cdbb;font-size:clamp(16px,3vmin,22px)}
+.tool[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
+.tool.done{background:#fff3c4}
+.sz{display:block;border-radius:50%;background:var(--ink);margin:auto}
+.paperthumb{display:block;width:100%;aspect-ratio:16/9;background:#fffdf8;border-bottom:2px dashed #e7cdbb;margin-bottom:4px}
+#sayBox.hub{left:4%;top:30%;bottom:auto;transform:none;max-width:30%}
+#me .av img{width:100%;height:100%;object-fit:cover;object-position:50% 14%;border-radius:50%;background:#fff}
+.pick img{display:block;height:84px;margin:0 auto 2px}
+
+/* hub */
+#hubUI{position:absolute;inset:0;z-index:5;pointer-events:none}
+#hubUI>*{pointer-events:auto}
+.title{position:absolute;top:3%;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none}
+.title .en{font-family:var(--f-en);font-weight:700;font-size:clamp(30px,6.4vmin,58px);color:var(--ink);line-height:.9}
+.title .zh{font-size:clamp(18px,3.6vmin,32px);color:var(--ink);letter-spacing:.08em}
+.ribbon{display:inline-block;margin-top:6px;background:#f6e3b8;border-radius:6px;padding:4px 22px;font-size:clamp(15px,2.8vmin,24px);box-shadow:0 4px 10px rgba(94,74,62,.12)}
+.ribbon b{color:var(--accent-dk)}
+.menu{position:absolute;left:0;right:0;bottom:4%;display:flex;gap:2.2%;justify-content:center}
+.menu button{width:19%;aspect-ratio:1.8;border-radius:28px;background:rgba(255,252,246,.95);border:3px dashed #e7cdbb;box-shadow:0 10px 24px rgba(94,74,62,.18);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:clamp(15px,2.9vmin,26px);transition:transform .15s}
+.menu button:hover{transform:translateY(-4px)}
+.menu .big{font-size:clamp(30px,6vmin,56px);line-height:1}
+.menu small{font-size:.65em;color:var(--pencil)}
+.menu .m4{background:#fff3d6}
+.menu .m1{background:#e8f1fb}.menu .m2{background:#fdeaf0}.menu .m3{background:#eaf3e2}
+.rooms{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:8px 0 16px}
+.rooms button{border-radius:14px;overflow:hidden;border:2px dashed #e7cdbb;background:#fff;font-size:18px;padding:0 0 6px}
+.rooms img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;margin-bottom:4px}
+.rooms button[disabled]{opacity:.45;cursor:not-allowed}
+.rooms small.lv{display:block;font-size:13px;letter-spacing:1px;margin-top:2px}
+.book{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-height:46vh;overflow:auto;margin:8px 0 16px}
+.book span{display:flex;align-items:center;gap:6px;background:#fdf0f2;border:1.5px dashed #efb9c6;border-radius:999px;padding:3px 12px 3px 3px;font-size:17px}
+.book img{width:36px;height:36px;border-radius:50%;object-fit:cover}
+.book b{font-family:var(--f-en);color:var(--accent-dk);font-size:20px}
+.pano{position:absolute;left:0;top:0;height:100%;aspect-ratio:3/1;transition:transform 9s linear;z-index:1}
+.pano img{width:100%;height:100%;display:block}
+.pano.go{transform:translateX(-40.7%)}
+.char.walkhop{animation:hop .5s ease-in-out infinite}
+.petal{position:absolute;top:-8%;width:16px;height:12px;border-radius:60% 0 60% 0;animation:fall linear forwards;z-index:10;pointer-events:none}
+@keyframes fall{to{transform:translateY(120vh) rotate(600deg)}}
+@media (max-width:640px){#path{display:none} #lvBadge .lvname{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+  <div id="stage"><img id="bg" alt=""><div id="layer"></div><div id="hubUI" hidden>
+    <div class="title"><div class="en">Baby Cotton</div><div class="zh">小棉花的冒險日記</div><div class="ribbon"><b id="ribName"></b>，一起來棉花家玩！</div></div>
+    <div class="menu">
+      <button class="m1" id="mFree"><span class="big">🏡</span>棉花的家<small>自由探索</small></button>
+      <button class="m2" id="mStory"><span class="big">🗺️</span>故事冒險<small>關卡遊戲</small></button>
+      <button class="m3" id="mBook"><span class="big">⭐</span>成長紀錄<small>學會的字</small></button>
+      <button class="m4" id="mPaint"><span class="big">🎨</span>魔法畫室<small>畫畫、上色</small></button>
+    </div>
+  </div></div>
+
+  <div class="top">
+    <div class="chip" id="me" hidden><span class="av" id="meAv"></span><span><b id="meName"></b><small id="meAge"></small></span></div>
+    <button class="chip iconbtn" id="homeBtn" aria-label="回首頁" hidden>🏠</button>
+    <div class="chip" id="lvBadge" hidden></div>
+    <div class="spacer"></div>
+    <div class="chip" id="path" hidden></div>
+    <button class="chip iconbtn" id="setBtn" aria-label="設定">⚙️</button>
+    <button class="chip iconbtn" id="sndBtn" aria-label="音效">🔊</button>
+  </div>
+
+  <div class="say" id="sayBox" hidden><span class="who" id="who">棉花</span><span id="line"></span></div>
+  <button class="chip" id="replay" aria-label="再說一次" hidden>🗣️</button>
+  <button class="go" id="next" hidden></button>
+
+  <div id="card" hidden><div class="in"><img id="cImg" alt=""><div class="zy" id="cZy"></div><div class="zh" id="cZh"></div><div class="en" id="cEn"></div></div></div>
+
+  <div class="overlay" id="setup">
+    <div class="panel">
+      <img class="hero" id="setupHero" alt="棉花">
+      <h2>Baby Cotton 小棉花的冒險日記</h2>
+      <div class="form">
+        <label for="nm">你叫什麼名字？</label>
+        <input id="nm" maxlength="12" placeholder="例如：Vivian" autocomplete="off">
+        <div class="q">你幾歲？</div>
+        <div class="row" id="ages"></div>
+        <div class="q">你是男生還是女生？</div>
+        <div class="row"><button class="pick boy" data-g="boy" aria-pressed="false"><img id="pkBoy" alt="">男生</button><button class="pick girl" data-g="girl" aria-pressed="false"><img id="pkGirl" alt="">女生</button></div>
+        <div class="q">語言 Language</div>
+        <div class="row" id="langs"><button class="pick" data-lang="tw" aria-pressed="false">繁體＋注音</button><button class="pick" data-lang="cn" aria-pressed="false">简体＋拼音</button><button class="pick" data-lang="en" aria-pressed="false">English → 中文</button></div>
+        <div class="q">聲音（爸爸媽媽可以幫忙選）</div>
+        <div class="row" id="packs"></div>
+      </div>
+      <button class="go" id="play" disabled>準備中…</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="free" hidden><div class="panel"><h2>棉花的家</h2><div class="sub">想去哪個房間玩？</div><div class="rooms" id="roomList"></div><button class="go" data-close>回首頁</button></div></div>
+  <div class="overlay" id="paintPick" hidden><div class="panel"><h2 id="paintTitle">魔法畫室</h2><div class="sub" id="paintSub">想畫在哪裡？</div><div class="rooms" id="paintList"></div><button class="go" data-close>回首頁</button></div></div>
+  <div id="paintBar" hidden></div>
+  <div class="overlay" id="bookPanel" hidden><div class="panel"><h2 id="bookTitle">成長紀錄</h2><div class="sub" id="bookSub"></div><div class="book" id="bookList"></div><button class="go" data-close>回首頁</button></div></div>
+  <div class="overlay" id="done" hidden><div class="panel"><img class="hero" id="doneHero" alt="棉花"><h2 id="doneTitle"></h2><div class="sub" id="doneSub"></div><button class="go" id="doneBtn">回首頁</button></div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+// ---------- words ----------
+/*W*/const W={"door": ["門", "ㄇㄣˊ", "Door", "叩叩叩，開門囉！", "mén", "Knock, knock! Open the door!", "门", "叩叩叩，开门啰！"], "window": ["窗戶", "ㄔㄨㄤ ㄏㄨˋ", "Window", "打開窗戶，看看外面。", "chuāng hù", "Let's look out the window.", "窗户", "打开窗户，看看外面。"], "flower": ["花", "ㄏㄨㄚ", "Flower", "花好香喔！", "huā", "The flowers smell so nice!", "花", "花好香喔！"], "mailbox": ["信箱", "ㄒㄧㄣˋ ㄒㄧㄤ", "Mailbox", "信箱裡有信嗎？", "xìn xiāng", "Is there a letter in the mailbox?", "信箱", "信箱里有信吗？"], "bird": ["小鳥", "ㄒㄧㄠˇ ㄋㄧㄠˇ", "Bird", "小鳥唱歌，啾啾啾。", "xiǎo niǎo", "The bird sings, tweet tweet.", "小鸟", "小鸟唱歌，啾啾啾。"], "birdhouse": ["鳥屋", "ㄋㄧㄠˇ ㄨ", "Birdhouse", "這是小鳥的家。", "niǎo wū", "This is the bird's house.", "鸟屋", "这是小鸟的家。"], "dad": ["爸爸", "ㄅㄚˋ ˙ㄅㄚ", "Daddy", "我愛爸爸！", "bà ba", "I love Daddy!", "爸爸", "我爱爸爸！"], "mom": ["媽媽", "ㄇㄚ ˙ㄇㄚ", "Mommy", "我愛媽媽！", "mā ma", "I love Mommy!", "妈妈", "我爱妈妈！"], "cotton": ["棉花", "ㄇㄧㄢˊ ㄏㄨㄚ", "Cotton", "我是棉花！", "mián huā", "I am Cotton!", "棉花", "我是棉花！"], "teddy": ["小熊", "ㄒㄧㄠˇ ㄒㄩㄥˊ", "Teddy bear", "小熊軟軟的，抱一抱。", "xiǎo xióng", "The teddy bear is soft. Hug!", "小熊", "小熊软软的，抱一抱。"], "ball": ["球", "ㄑㄧㄡˊ", "Ball", "球滾來滾去。", "qiú", "The ball rolls and rolls.", "球", "球滚来滚去。"], "blocks": ["積木", "ㄐㄧ ㄇㄨˋ", "Blocks", "積木疊高高。", "jī mù", "Stack the blocks up high.", "积木", "积木叠高高。"], "clock": ["時鐘", "ㄕˊ ㄓㄨㄥ", "Clock", "時鐘滴答滴答。", "shí zhōng", "The clock goes tick tock.", "时钟", "时钟滴答滴答。"], "sofa": ["沙發", "ㄕㄚ ㄈㄚ", "Sofa", "沙發軟軟的，坐下來。", "shā fā", "The sofa is soft. Sit down!", "沙发", "沙发软软的，坐下来。"], "books": ["書", "ㄕㄨ", "Books", "我們一起看書。", "shū", "Let's read books together.", "书", "我们一起看书。"], "lamp": ["路燈", "ㄌㄨˋ ㄉㄥ", "Street lamp", "晚上路燈亮亮的。", "lù dēng", "The street lamp is bright at night.", "路灯", "晚上路灯亮亮的。"], "milk": ["牛奶", "ㄋㄧㄡˊ ㄋㄞˇ", "Milk", "喝牛奶，長高高。", "niú nǎi", "Drink milk and grow tall.", "牛奶", "喝牛奶，长高高。"], "banana": ["香蕉", "ㄒㄧㄤ ㄐㄧㄠ", "Banana", "香蕉黃黃的。", "xiāng jiāo", "The banana is yellow.", "香蕉", "香蕉黄黄的。"], "apple": ["蘋果", "ㄆㄧㄥˊ ㄍㄨㄛˇ", "Apple", "蘋果紅紅的。", "píng guǒ", "The apple is red.", "苹果", "苹果红红的。"], "bowl": ["碗", "ㄨㄢˇ", "Bowl", "用碗吃飯。", "wǎn", "We eat from a bowl.", "碗", "用碗吃饭。"], "spoon": ["湯匙", "ㄊㄤ ㄔˊ", "Spoon", "用湯匙喝湯。", "tāng chí", "We eat soup with a spoon.", "汤匙", "用汤匙喝汤。"], "fridge": ["冰箱", "ㄅㄧㄥ ㄒㄧㄤ", "Fridge", "冰箱裡面冷冷的。", "bīng xiāng", "It is cold inside the fridge.", "冰箱", "冰箱里面冷冷的。"], "kettle": ["水壺", "ㄕㄨㄟˇ ㄏㄨˊ", "Kettle", "水壺可以燒開水。", "shuǐ hú", "The kettle boils water.", "水壶", "水壶可以烧开水。"], "duck": ["小鴨子", "ㄒㄧㄠˇ ㄧㄚ ˙ㄗ", "Duck", "小鴨子呱呱呱！", "xiǎo yā zi", "The duck says quack quack!", "小鸭子", "小鸭子呱呱呱！"], "toothbrush": ["牙刷", "ㄧㄚˊ ㄕㄨㄚ", "Toothbrush", "刷刷牙，牙齒白白的。", "yá shuā", "Brush your teeth!", "牙刷", "刷刷牙，牙齿白白的。"], "mirror": ["鏡子", "ㄐㄧㄥˋ ˙ㄗ", "Mirror", "鏡子裡有誰？", "jìng zi", "Who is in the mirror?", "镜子", "镜子里有谁？"], "towel": ["毛巾", "ㄇㄠˊ ㄐㄧㄣ", "Towel", "用毛巾擦擦手。", "máo jīn", "Dry your hands with a towel.", "毛巾", "用毛巾擦擦手。"], "tub": ["浴缸", "ㄩˋ ㄍㄤ", "Bathtub", "在浴缸洗澡囉！", "yù gāng", "Bath time in the tub!", "浴缸", "在浴缸洗澡啰！"], "sink": ["洗手台", "ㄒㄧˇ ㄕㄡˇ ㄊㄞˊ", "Sink", "在這裡洗洗手。", "xǐ shǒu tái", "Wash your hands here.", "洗手台", "在这里洗洗手。"], "swing": ["盪鞦韆", "ㄉㄤˋ ㄑㄧㄡ ㄑㄧㄢ", "Swing", "盪鞦韆，盪高高！", "dàng qiū qiān", "Swing up high!", "荡秋千", "荡秋千，荡高高！"], "slide": ["溜滑梯", "ㄌㄧㄡ ㄏㄨㄚˊ ㄊㄧ", "Slide", "咻！溜下來！", "liū huá tī", "Whee! Down the slide!", "溜滑梯", "咻！溜下来！"], "bucket": ["小水桶", "ㄒㄧㄠˇ ㄕㄨㄟˇ ㄊㄨㄥˇ", "Bucket", "用小水桶裝沙子。", "xiǎo shuǐ tǒng", "Fill the bucket with sand.", "小水桶", "用小水桶装沙子。"], "sandbox": ["沙坑", "ㄕㄚ ㄎㄥ", "Sandbox", "我們一起玩沙子。", "shā kēng", "Let's play in the sand.", "沙坑", "我们一起玩沙子。"], "bench": ["長椅", "ㄔㄤˊ ㄧˇ", "Bench", "坐在長椅上休息。", "cháng yǐ", "Sit on the bench and rest.", "长椅", "坐在长椅上休息。"], "pond": ["池塘", "ㄔˊ ㄊㄤˊ", "Pond", "池塘的水亮晶晶。", "chí táng", "The pond water sparkles.", "池塘", "池塘的水亮晶晶。"], "tree": ["大樹", "ㄉㄚˋ ㄕㄨˋ", "Tree", "大樹的葉子綠綠的。", "dà shù", "The tree has green leaves.", "大树", "大树的叶子绿绿的。"], "frog": ["青蛙", "ㄑㄧㄥ ㄨㄚ", "Frog", "青蛙呱呱叫，跳跳跳！", "qīng wā", "The frog croaks and hops!", "青蛙", "青蛙呱呱叫，跳跳跳！"], "school": ["學校", "ㄒㄩㄝˊ ㄒㄧㄠˋ", "School", "學校好大喔！", "xué xiào", "The school is so big!", "学校", "学校好大喔！"], "car": ["汽車", "ㄑㄧˋ ㄔㄜ", "Car", "汽車叭叭叭！", "qì chē", "The car goes beep beep!", "汽车", "汽车叭叭叭！"], "chimney": ["煙囪", "ㄧㄢ ㄘㄨㄥ", "Chimney", "煙囪在屋頂上。", "yān cōng", "The chimney is on the roof.", "烟囱", "烟囱在屋顶上。"], "roof": ["屋頂", "ㄨ ㄉㄧㄥˇ", "Roof", "紅紅的屋頂。", "wū dǐng", "The roof is red.", "屋顶", "红红的屋顶。"], "stairs": ["樓梯", "ㄌㄡˊ ㄊㄧ", "Stairs", "走樓梯，一步一步。", "lóu tī", "Up the stairs, step by step.", "楼梯", "走楼梯，一步一步。"], "pot": ["花盆", "ㄏㄨㄚ ㄆㄣˊ", "Flowerpot", "花盆裡有漂亮的花。", "huā pén", "Pretty flowers in the pot.", "花盆", "花盆里有漂亮的花。"], "sakura": ["櫻花樹", "ㄧㄥ ㄏㄨㄚ ㄕㄨˋ", "Cherry tree", "粉紅色的櫻花樹。", "yīng huā shù", "A pink cherry tree.", "樱花树", "粉红色的樱花树。"], "sidewalk": ["人行道", "ㄖㄣˊ ㄒㄧㄥˊ ㄉㄠˋ", "Sidewalk", "走路要走人行道。", "rén xíng dào", "We walk on the sidewalk.", "人行道", "走路要走人行道。"], "fence": ["圍籬", "ㄨㄟˊ ㄌㄧˊ", "Fence", "白白的圍籬。", "wéi lí", "A white fence.", "围篱", "白白的围篱。"], "desklamp": ["檯燈", "ㄊㄞˊ ㄉㄥ", "Lamp", "打開檯燈，亮亮的。", "tái dēng", "Turn on the lamp. So bright!", "台灯", "打开台灯，亮亮的。"], "cup": ["杯子", "ㄅㄟ ˙ㄗ", "Cup", "用杯子喝水。", "bēi zi", "Drink water from a cup.", "杯子", "用杯子喝水。"], "vase": ["花瓶", "ㄏㄨㄚ ㄆㄧㄥˊ", "Vase", "花瓶裡有小白花。", "huā píng", "Little white flowers in the vase.", "花瓶", "花瓶里有小白花。"], "table": ["桌子", "ㄓㄨㄛ ˙ㄗ", "Table", "桌子圓圓的。", "zhuō zi", "The table is round.", "桌子", "桌子圆圆的。"], "picture": ["畫", "ㄏㄨㄚˋ", "Picture", "牆上有一幅畫。", "huà", "A picture on the wall.", "画", "墙上有一幅画。"], "plant": ["盆栽", "ㄆㄣˊ ㄗㄞ", "Plant", "綠綠的盆栽。", "pén zāi", "A green plant.", "盆栽", "绿绿的盆栽。"], "basket": ["籃子", "ㄌㄢˊ ˙ㄗ", "Basket", "籃子裡有東西喔！", "lán zi", "Something is in the basket!", "篮子", "篮子里有东西喔！"], "rug": ["地毯", "ㄉㄧˋ ㄊㄢˇ", "Rug", "地毯軟軟的。", "dì tǎn", "The rug is soft.", "地毯", "地毯软软的。"], "cabinet": ["櫃子", "ㄍㄨㄟˋ ˙ㄗ", "Cabinet", "打開櫃子看一看。", "guì zi", "Let's open the cabinet.", "柜子", "打开柜子看一看。"], "chair": ["椅子", "ㄧˇ ˙ㄗ", "Chair", "坐在椅子上。", "yǐ zi", "Sit on the chair.", "椅子", "坐在椅子上。"], "faucet": ["水龍頭", "ㄕㄨㄟˇ ㄌㄨㄥˊ ㄊㄡˊ", "Faucet", "打開水龍頭，嘩啦啦。", "shuǐ lóng tóu", "Turn on the faucet. Splash!", "水龙头", "打开水龙头，哗啦啦。"], "pan": ["鍋子", "ㄍㄨㄛ ˙ㄗ", "Pot", "用鍋子煮湯。", "guō zi", "We cook soup in a pot.", "锅子", "用锅子煮汤。"], "shampoo": ["洗髮精", "ㄒㄧˇ ㄈㄚˇ ㄐㄧㄥ", "Shampoo", "洗頭髮，泡泡多多。", "xǐ fà jīng", "Wash your hair. Lots of bubbles!", "洗发精", "洗头发，泡泡多多。"], "soap": ["洗手乳", "ㄒㄧˇ ㄕㄡˇ ㄖㄨˇ", "Hand soap", "用洗手乳洗手。", "xǐ shǒu rǔ", "Wash your hands with soap.", "洗手乳", "用洗手乳洗手。"], "flag": ["旗子", "ㄑㄧˊ ˙ㄗ", "Flag", "旗子飄呀飄。", "qí zi", "The flag waves.", "旗子", "旗子飘呀飘。"], "mountain": ["山", "ㄕㄢ", "Mountain", "遠遠的山。", "shān", "The mountains are far away.", "山", "远远的山。"], "cloud": ["雲", "ㄩㄣˊ", "Cloud", "白白的雲。", "yún", "A white cloud.", "云", "白白的云。"], "globe": ["地球儀", "ㄉㄧˋ ㄑㄧㄡˊ ㄧˊ", "Globe", "地球儀轉呀轉。", "dì qiú yí", "The globe spins round.", "地球仪", "地球仪转呀转。"], "lantern": ["提燈", "ㄊㄧˊ ㄉㄥ", "Lantern", "提燈亮亮的。", "tí dēng", "The lantern glows.", "提灯", "提灯亮亮的。"], "bunnydoll": ["兔子娃娃", "ㄊㄨˋ ˙ㄗ ㄨㄚˊ ˙ㄨㄚ", "Bunny doll", "可愛的兔子娃娃。", "tù zi wá wa", "A cute bunny doll.", "兔子娃娃", "可爱的兔子娃娃。"], "cat": ["小貓", "ㄒㄧㄠˇ ㄇㄠ", "Kitty", "小貓喵喵喵。", "xiǎo māo", "The kitty says meow.", "小猫", "小猫喵喵喵。"], "dog": ["小狗", "ㄒㄧㄠˇ ㄍㄡˇ", "Puppy", "小狗汪汪汪。", "xiǎo gǒu", "The puppy says woof woof.", "小狗", "小狗汪汪汪。"], "blanket": ["毯子", "ㄊㄢˇ ˙ㄗ", "Blanket", "蓋上毯子，暖暖的。", "tǎn zi", "A warm blanket.", "毯子", "盖上毯子，暖暖的。"], "horse": ["木馬", "ㄇㄨˋ ㄇㄚˇ", "Rocking horse", "騎木馬，搖呀搖。", "mù mǎ", "Rock, rock on the horse.", "木马", "骑木马，摇呀摇。"], "rings": ["套圈圈", "ㄊㄠˋ ㄑㄩㄢ ㄑㄩㄢ", "Stacking rings", "一圈一圈疊起來。", "tào quān quān", "Stack the rings one by one.", "套圈圈", "一圈一圈叠起来。"], "train": ["小火車", "ㄒㄧㄠˇ ㄏㄨㄛˇ ㄔㄜ", "Toy train", "小火車嘟嘟嘟！", "xiǎo huǒ chē", "The train goes choo choo!", "小火车", "小火车嘟嘟嘟！"], "storybook": ["故事書", "ㄍㄨˋ ㄕˋ ㄕㄨ", "Storybook", "打開故事書，講故事囉。", "gù shì shū", "Open the storybook.", "故事书", "打开故事书，讲故事啰。"], "cookie": ["餅乾", "ㄅㄧㄥˇ ㄍㄢ", "Cookies", "香香的餅乾。", "bǐng gān", "Yummy cookies.", "饼干", "香香的饼干。"], "teapot": ["茶壺", "ㄔㄚˊ ㄏㄨˊ", "Teapot", "茶壺裡有熱茶。", "chá hú", "Hot tea in the teapot.", "茶壶", "茶壶里有热茶。"], "jar": ["罐子", "ㄍㄨㄢˋ ˙ㄗ", "Jar", "罐子裡有好吃的。", "guàn zi", "Something yummy in the jar.", "罐子", "罐子里有好吃的。"], "fruitbasket": ["水果籃", "ㄕㄨㄟˇ ㄍㄨㄛˇ ㄌㄢˊ", "Fruit basket", "水果籃裡有好多水果。", "shuǐ guǒ lán", "Lots of fruit in the basket.", "水果篮", "水果篮里有好多水果。"], "blender": ["果汁機", "ㄍㄨㄛˇ ㄓ ㄐㄧ", "Blender", "果汁機打果汁。", "guǒ zhī jī", "The blender makes juice.", "果汁机", "果汁机打果汁。"], "toaster": ["烤麵包機", "ㄎㄠˇ ㄇㄧㄢˋ ㄅㄠ ㄐㄧ", "Toaster", "烤麵包機烤吐司。", "kǎo miàn bāo jī", "The toaster makes toast.", "烤面包机", "烤面包机烤吐司。"], "spatula": ["鍋鏟", "ㄍㄨㄛ ㄔㄢˇ", "Spatula", "用鍋鏟炒菜。", "guō chǎn", "Cook with a spatula.", "锅铲", "用锅铲炒菜。"], "stove": ["爐子", "ㄌㄨˊ ˙ㄗ", "Stove", "爐子煮東西。", "lú zi", "We cook on the stove.", "炉子", "炉子煮东西。"], "oven": ["烤箱", "ㄎㄠˇ ㄒㄧㄤ", "Oven", "烤箱在烤蛋糕。", "kǎo xiāng", "Cakes in the oven.", "烤箱", "烤箱在烤蛋糕。"], "stool": ["小板凳", "ㄒㄧㄠˇ ㄅㄢˇ ㄉㄥˋ", "Stool", "踩上小板凳。", "xiǎo bǎn dèng", "Step up on the stool.", "小板凳", "踩上小板凳。"], "bread": ["麵包", "ㄇㄧㄢˋ ㄅㄠ", "Bread", "香香的麵包。", "miàn bāo", "Yummy bread.", "面包", "香香的面包。"], "jam": ["果醬", "ㄍㄨㄛˇ ㄐㄧㄤˋ", "Jam", "甜甜的果醬。", "guǒ jiàng", "Sweet jam.", "果酱", "甜甜的果酱。"], "strawberry": ["草莓", "ㄘㄠˇ ㄇㄟˊ", "Strawberry", "草莓紅紅的。", "cǎo méi", "Red strawberries.", "草莓", "草莓红红的。"], "lunchbox": ["便當盒", "ㄅㄧㄢˋ ㄉㄤ ㄏㄜˊ", "Lunch box", "便當盒裡有午餐。", "biàn dāng hé", "Lunch is in the lunch box.", "便当盒", "便当盒里有午餐。"], "squirrel": ["松鼠", "ㄙㄨㄥ ㄕㄨˇ", "Squirrel", "松鼠在吃果子。", "sōng shǔ", "The squirrel eats a nut.", "松鼠", "松鼠在吃果子。"], "butterfly": ["蝴蝶", "ㄏㄨˊ ㄉㄧㄝˊ", "Butterfly", "蝴蝶飛呀飛。", "hú dié", "The butterfly flies.", "蝴蝶", "蝴蝶飞呀飞。"], "dragonfly": ["蜻蜓", "ㄑㄧㄥ ㄊㄧㄥˊ", "Dragonfly", "蜻蜓飛得好快。", "qīng tíng", "The dragonfly is fast.", "蜻蜓", "蜻蜓飞得好快。"], "hat": ["帽子", "ㄇㄠˋ ˙ㄗ", "Hat", "戴上帽子出門。", "mào zi", "Put on your hat.", "帽子", "戴上帽子出门。"], "tricycle": ["三輪車", "ㄙㄢ ㄌㄨㄣˊ ㄔㄜ", "Tricycle", "騎三輪車，出發！", "sān lún chē", "Ride the tricycle!", "三轮车", "骑三轮车，出发！"], "pinwheel": ["風車", "ㄈㄥ ㄔㄜ", "Pinwheel", "風車轉呀轉。", "fēng chē", "The pinwheel spins.", "风车", "风车转呀转。"], "sandcastle": ["沙堡", "ㄕㄚ ㄅㄠˇ", "Sandcastle", "蓋一個沙堡。", "shā bǎo", "Build a sandcastle.", "沙堡", "盖一个沙堡。"], "shovel": ["小鏟子", "ㄒㄧㄠˇ ㄔㄢˇ ˙ㄗ", "Shovel", "用小鏟子挖沙。", "xiǎo chǎn zi", "Dig with the shovel.", "小铲子", "用小铲子挖沙。"], "hopscotch": ["跳房子", "ㄊㄧㄠˋ ㄈㄤˊ ˙ㄗ", "Hopscotch", "跳房子，一二三！", "tiào fáng zi", "Hopscotch! One, two, three!", "跳房子", "跳房子，一二三！"], "chalk": ["粉筆", "ㄈㄣˇ ㄅㄧˇ", "Chalk", "用粉筆畫畫。", "fěn bǐ", "Draw with chalk.", "粉笔", "用粉笔画画。"], "picnic": ["野餐籃", "ㄧㄝˇ ㄘㄢ ㄌㄢˊ", "Picnic basket", "一起去野餐。", "yě cān lán", "Let's have a picnic.", "野餐篮", "一起去野餐。"], "bottle": ["水瓶", "ㄕㄨㄟˇ ㄆㄧㄥˊ", "Water bottle", "口渴了，喝水。", "shuǐ píng", "Thirsty? Drink water.", "水瓶", "口渴了，喝水。"], "sailboat": ["小帆船", "ㄒㄧㄠˇ ㄈㄢ ㄔㄨㄢˊ", "Sailboat", "小帆船在水上漂。", "xiǎo fān chuán", "The sailboat floats.", "小帆船", "小帆船在水上漂。"], "wateringcan": ["澆水壺", "ㄐㄧㄠ ㄕㄨㄟˇ ㄏㄨˊ", "Watering can", "幫花澆澆水。", "jiāo shuǐ hú", "Water the flowers.", "浇水壶", "帮花浇浇水。"], "bike": ["腳踏車", "ㄐㄧㄠˇ ㄊㄚˋ ㄔㄜ", "Bike", "騎腳踏車，叮鈴鈴！", "jiǎo tà chē", "Ride the bike. Ring ring!", "脚踏车", "骑脚踏车，叮铃铃！"], "shower": ["蓮蓬頭", "ㄌㄧㄢˊ ㄆㄥˊ ㄊㄡˊ", "Shower", "洗澡囉，嘩啦啦。", "lián péng tóu", "Shower time! Splash!", "莲蓬头", "洗澡啰，哗啦啦。"], "bubble": ["泡泡", "ㄆㄠˋ ㄆㄠˋ", "Bubbles", "好多泡泡。", "pào pào", "So many bubbles!", "泡泡", "好多泡泡。"], "curtain": ["浴簾", "ㄩˋ ㄌㄧㄢˊ", "Shower curtain", "粉紅色的浴簾。", "yù lián", "A pink shower curtain.", "浴帘", "粉红色的浴帘。"], "slippers": ["拖鞋", "ㄊㄨㄛ ㄒㄧㄝˊ", "Slippers", "穿上拖鞋。", "tuō xié", "Put on your slippers.", "拖鞋", "穿上拖鞋。"], "laundry": ["洗衣籃", "ㄒㄧˇ ㄧ ㄌㄢˊ", "Laundry basket", "髒衣服放這裡。", "xǐ yī lán", "Dirty clothes go here.", "洗衣篮", "脏衣服放这里。"], "barsoap": ["肥皂", "ㄈㄟˊ ㄗㄠˋ", "Soap", "用肥皂洗一洗。", "féi zào", "Wash with soap.", "肥皂", "用肥皂洗一洗。"], "sponge": ["海綿", "ㄏㄞˇ ㄇㄧㄢˊ", "Sponge", "海綿軟軟的。", "hǎi mián", "The sponge is soft.", "海绵", "海绵软软的。"], "brush": ["刷子", "ㄕㄨㄚ ˙ㄗ", "Brush", "用刷子刷一刷。", "shuā zi", "Scrub with a brush.", "刷子", "用刷子刷一刷。"], "bed": ["床", "ㄔㄨㄤˊ", "Bed", "床軟軟的，躺下來。", "chuáng", "The bed is soft. Lie down!", "床", "床软软的，躺下来。"], "pillow": ["枕頭", "ㄓㄣˇ ㄊㄡˊ", "Pillow", "抱著枕頭睡覺覺。", "zhěn tóu", "Hug the pillow and sleep.", "枕头", "抱著枕头睡觉觉。"], "backpack": ["背包", "ㄅㄟ ㄅㄠ", "Backpack", "背上背包去探險！", "bēi bāo", "Put on your backpack. Let's explore!", "背包", "背上背包去探险！"], "chest": ["寶箱", "ㄅㄠˇ ㄒㄧㄤ", "Treasure chest", "寶箱裡有什麼呢？", "bǎo xiāng", "What is in the treasure chest?", "宝箱", "宝箱里有什么呢？"], "airplane": ["小飛機", "ㄒㄧㄠˇ ㄈㄟ ㄐㄧ", "Toy plane", "小飛機飛高高！", "xiǎo fēi jī", "The plane flies up high!", "小飞机", "小飞机飞高高！"], "desk": ["書桌", "ㄕㄨ ㄓㄨㄛ", "Desk", "在書桌上畫畫。", "shū zhuō", "Draw at the desk.", "书桌", "在书桌上画画。"], "bookshelf": ["書櫃", "ㄕㄨ ㄍㄨㄟˋ", "Bookshelf", "書櫃裡有好多書。", "shū guì", "Lots of books on the bookshelf.", "书柜", "书柜里有好多书。"], "cushion": ["坐墊", "ㄗㄨㄛˋ ㄉㄧㄢˋ", "Cushion", "坐在坐墊上。", "zuò diàn", "Sit on the cushion.", "坐垫", "坐在坐垫上。"], "nightlight": ["小夜燈", "ㄒㄧㄠˇ ㄧㄝˋ ㄉㄥ", "Night light", "小夜燈亮亮的，不怕黑。", "xiǎo yè dēng", "The night light glows. No more dark!", "小夜灯", "小夜灯亮亮的，不怕黑。"], "pencils": ["色鉛筆", "ㄙㄜˋ ㄑㄧㄢ ㄅㄧˇ", "Colored pencils", "用色鉛筆畫畫。", "sè qiān bǐ", "Draw with colored pencils.", "色铅笔", "用色铅笔画画。"], "curtains": ["窗簾", "ㄔㄨㄤ ㄌㄧㄢˊ", "Curtains", "拉開窗簾，太陽出來了！", "chuāng lián", "Open the curtains. Hello, sun!", "窗帘", "拉开窗帘，太阳出来了！"], "nightstand": ["床頭櫃", "ㄔㄨㄤˊ ㄊㄡˊ ㄍㄨㄟˋ", "Nightstand", "床頭櫃上有一盞燈。", "chuáng tóu guì", "A lamp on the nightstand.", "床头柜", "床头柜上有一盏灯。"], "wardrobe": ["衣櫃", "ㄧ ㄍㄨㄟˋ", "Wardrobe", "衣櫃裡有好多衣服。", "yī guì", "Lots of clothes in the wardrobe.", "衣柜", "衣柜里有好多衣服。"], "red": ["紅色", "ㄏㄨㄥˊ ㄙㄜˋ", "Red", "紅紅的蘋果。", "hóng sè", "A red apple.", "红色", "红红的苹果。"], "orange": ["橘色", "ㄐㄩˊ ㄙㄜˋ", "Orange", "橘色的紅蘿蔔。", "jú sè", "An orange carrot.", "橘色", "橘色的红萝卜。"], "yellow": ["黃色", "ㄏㄨㄤˊ ㄙㄜˋ", "Yellow", "黃色的香蕉。", "huáng sè", "A yellow banana.", "黄色", "黄色的香蕉。"], "green": ["綠色", "ㄌㄩˋ ㄙㄜˋ", "Green", "綠色的葉子。", "lǜ sè", "Green leaves.", "绿色", "绿色的叶子。"], "blue": ["藍色", "ㄌㄢˊ ㄙㄜˋ", "Blue", "藍色的天空。", "lán sè", "The blue sky.", "蓝色", "蓝色的天空。"], "purple": ["紫色", "ㄗˇ ㄙㄜˋ", "Purple", "紫色的葡萄。", "zǐ sè", "Purple grapes.", "紫色", "紫色的葡萄。"], "pink": ["粉紅色", "ㄈㄣˇ ㄏㄨㄥˊ ㄙㄜˋ", "Pink", "粉紅色的花。", "fěn hóng sè", "A pink flower.", "粉红色", "粉红色的花。"], "brown": ["咖啡色", "ㄎㄚ ㄈㄟ ㄙㄜˋ", "Brown", "咖啡色的大樹。", "kā fēi sè", "A brown tree trunk.", "咖啡色", "咖啡色的大树。"], "skyblue": ["天藍色", "ㄊㄧㄢ ㄌㄢˊ ㄙㄜˋ", "Sky blue", "天藍色的小鳥。", "tiān lán sè", "A sky blue bird.", "天蓝色", "天蓝色的小鸟。"], "lightgreen": ["淺綠色", "ㄑㄧㄢˇ ㄌㄩˋ ㄙㄜˋ", "Light green", "淺綠色的小草。", "qiǎn lǜ sè", "Light green grass.", "浅绿色", "浅绿色的小草。"], "navy": ["深藍色", "ㄕㄣ ㄌㄢˊ ㄙㄜˋ", "Dark blue", "深藍色的大海。", "shēn lán sè", "The dark blue sea.", "深蓝色", "深蓝色的大海。"], "gray": ["灰色", "ㄏㄨㄟ ㄙㄜˋ", "Gray", "灰色的大象。", "huī sè", "A gray elephant.", "灰色", "灰色的大象。"], "gold": ["金色", "ㄐㄧㄣ ㄙㄜˋ", "Gold", "金色的星星。", "jīn sè", "A gold star.", "金色", "金色的星星。"], "peach": ["淺橘色", "ㄑㄧㄢˇ ㄐㄩˊ ㄙㄜˋ", "Light orange", "淺橘色的晚霞。", "qiǎn jú sè", "A light orange sunset.", "浅橘色", "浅橘色的晚霞。"], "black": ["黑色", "ㄏㄟ ㄙㄜˋ", "Black", "黑色的夜晚。", "hēi sè", "The black night.", "黑色", "黑色的夜晚。"], "white": ["白色", "ㄅㄞˊ ㄙㄜˋ", "White", "白色的雲。", "bái sè", "A white cloud.", "白色", "白色的云。"]};
+const S2={"乾": "干", "來": "来", "個": "个", "們": "们", "偵": "侦", "備": "备", "儀": "仪", "別": "别", "創": "创", "問": "问", "嗎": "吗", "嘩": "哗", "嚕": "噜", "囉": "啰", "囪": "囱", "圍": "围", "園": "园", "圓": "圆", "塗": "涂", "墊": "垫", "壺": "壶", "媽": "妈", "學": "学", "寶": "宝", "尋": "寻", "對": "对", "帶": "带", "幫": "帮", "幾": "几", "廚": "厨", "廳": "厅", "後": "后", "愛": "爱", "戲": "戏", "戶": "户", "搖": "摇", "時": "时", "曉": "晓", "書": "书", "會": "会", "東": "东", "樓": "楼", "樣": "样", "樹": "树", "機": "机", "檯": "台", "櫃": "柜", "櫻": "樱", "歡": "欢", "歲": "岁", "沒": "没", "淺": "浅", "湯": "汤", "準": "准", "滾": "滚", "澆": "浇", "灣": "湾", "煙": "烟", "熱": "热", "燈": "灯", "燒": "烧", "爐": "炉", "牆": "墙", "現": "现", "畫": "画", "當": "当", "疊": "叠", "發": "发", "盞": "盏", "盪": "荡", "種": "种", "積": "积", "筆": "笔", "簾": "帘", "籃": "篮", "籬": "篱", "紀": "纪", "紅": "红", "紙": "纸", "細": "细", "給": "给", "經": "经", "綠": "绿", "綿": "绵", "聲": "声", "聽": "听", "腳": "脚", "臉": "脸", "葉": "叶", "蓋": "盖", "蓮": "莲", "蔔": "卜", "藍": "蓝", "蘋": "苹", "蘿": "萝", "裝": "装", "裡": "里", "覺": "觉", "記": "记", "設": "设", "試": "试", "該": "该", "認": "认", "語": "语", "說": "说", "誰": "谁", "講": "讲", "識": "识", "貓": "猫", "質": "质", "車": "车", "軟": "软", "輪": "轮", "轉": "转", "這": "这", "進": "进", "遊": "游", "過": "过", "遠": "远", "選": "选", "還": "还", "邊": "边", "醬": "酱", "鈴": "铃", "鉛": "铅", "錄": "录", "鍋": "锅", "鎖": "锁", "鏟": "铲", "鏡": "镜", "鐘": "钟", "長": "长", "門": "门", "開": "开", "間": "间", "關": "关", "陽": "阳", "階": "阶", "險": "险", "雲": "云", "鞦": "秋", "韆": "千", "頁": "页", "頂": "顶", "頭": "头", "顏": "颜", "風": "风", "飄": "飘", "飛": "飞", "飯": "饭", "飽": "饱", "餅": "饼", "餓": "饿", "馬": "马", "騎": "骑", "髒": "脏", "體": "体", "髮": "发", "鳥": "鸟", "鴨": "鸭", "麵": "面", "麼": "么", "黃": "黄", "點": "点", "齒": "齿", "龍": "龙"};/*W_END*/
+
+// ================= 語言模式 =================
+// tw = 繁體＋注音（台灣）　cn = 简体＋拼音（中国大陆）　en = English → 中文（pinyin）
+const LANG=()=>ME.lang||"tw";
+const toS=t=>[...String(t)].map(c=>S2[c]||c).join("");
+const ROOM_EN={"門口":"front yard","客廳":"living room","廚房":"kitchen","浴室":"bathroom","公園":"park","房間":"bedroom","家人":"family","出門":"going out","走路":"walk"};
+const WHO_EN={"棉花":"Cotton","媽媽":"Mommy","旁白":"Narrator"};
+const ZH2KEY={}; for(const k in W) ZH2KEY[W[k][0]]=k;
+const en1=zh=>{ const k=ZH2KEY[zh]; return k?W[k][2].toLowerCase():zh; };
+/*EN*/const EN_FIXED={
+ "嗨，{n}！我是棉花，歡迎來我家玩！":"Hi, {n}! I'm Cotton. Welcome to my house!",
+ "嗨，{n}！我是棉花！來看看我的家，認識好多好多東西吧！":"Hi, {n}! I'm Cotton! Come see my house and learn lots of things!",
+ "{n}，這裡是棉花的家！點一下門，看看誰在家？":"{n}, this is Cotton's house! Tap the door. Who is home?",
+ "{n}，快進來客廳！我們來玩玩具！":"{n}, come into the living room! Let's play with toys!",
+ "肚子餓了！媽媽準備了早餐，{n}，看看桌上有什麼？":"I'm hungry! Mommy made breakfast. {n}, what's on the table?",
+ "吃飽了，{n}，我們來洗手、刷刷牙！":"All done eating! {n}, let's wash hands and brush teeth!",
+ "媽媽帶棉花去公園玩囉！{n}，你看公園裡有什麼？":"Mommy takes Cotton to the park! {n}, what can you see?",
+ "早安，{n}！我是棉花！媽媽說今天要帶我出去玩！":"Good morning, {n}! I'm Cotton! Mommy says we're going out to play today!",
+ "{n}，點點看這裡！":"{n}, tap here!",
+ "{n}，歡迎來到棉花的房間！這是我睡覺的地方喔！":"{n}, welcome to Cotton's room! This is where I sleep!",
+ "聲音小偵探！聽聽看，找出是哪一樣東西！":"Sound Detective! Listen and find the right thing!",
+ "猜猜看，是什麼？":"Guess what it is!",
+ "再聽一次！":"Listen again!",
+ "全部過關了！你是棉花冒險家！":"You passed every level! You're a Cotton Explorer!",
+ "{n}，想去哪個房間玩？":"{n}, which room do you want to play in?",
+ "{n}好棒！今天和棉花一起去了好多地方！":"Great job, {n}! You went to so many places with Cotton today!",
+ "{n}好棒！故事冒險完成！下一次，我們去森林尋寶！":"Great job, {n}! Story complete! Next time, let's go on a forest treasure hunt!",
+ "你好，我是棉花！":"Hello! I am Cotton.",
+ "媽媽帶棉花去公園玩囉！":"Mommy takes Cotton to the park!",
+ "早安！這是棉花的家人。":"Good morning! This is Cotton's family.",
+ "{n}，媽媽在哪裡？":"{n}, where is Mommy?",
+ "早安，棉花！早安，{n}！":"Good morning, Cotton! Good morning, {n}!",
+ "爸爸在哪裡？":"Where is Daddy?",
+ "棉花在哪裡？點點看！":"Where is Cotton? Tap!",
+ "我在這裡！":"Here I am!",
+ "我愛爸爸！":"I love Daddy!",
+ "{n}，想畫在哪裡？":"{n}, where do you want to draw?",
+ "選一個顏色，畫畫看吧！":"Pick a color and draw!",
+ "選一個顏色，幫棉花的家塗上顏色吧！":"Pick a color and paint Cotton's world!",
+ "哇！這是你創造的彩色世界，好特別呀！":"Wow! You made a colorful world. It's so special!",
+ "白紙":"White paper",
+ "我愛媽媽！":"I love Mommy!",
+ "{n}，我們家的汽車在哪裡？":"{n}, where is our car?",
+ "這是我們家的汽車！叭叭！今天要做什麼呢？":"This is our car! Beep beep! What shall we do today?",
+ "棉花起床了，要去浴室刷牙囉！":"Cotton is up! Time to brush teeth in the bathroom!",
+ "{n}，幫棉花找到牙刷！":"{n}, help Cotton find the toothbrush!",
+ "刷刷刷，牙齒白白的！":"Brush, brush, brush! Nice white teeth!",
+ "毛巾在哪裡？我要擦擦臉！":"Where is the towel? I want to dry my face!",
+ "擦一擦，好舒服！":"Wipe, wipe. That feels nice!",
+ "早餐準備好了！":"Breakfast is ready!",
+ "我想吃麵包！{n}，麵包在哪裡？":"I want bread! {n}, where is the bread?",
+ "麵包香香的，好好吃！":"The bread smells so good. Yummy!",
+ "{n}，幫棉花找到香蕉！":"{n}, help Cotton find the banana!",
+ "香蕉甜甜的，好好吃！":"The banana is sweet. Yummy!",
+ "吃飽了，我們來玩玩具！":"All full! Let's play with toys!",
+ "{n}，球在哪裡？":"{n}, where is the ball?",
+ "球滾來滾去，好好玩！":"The ball rolls and rolls. So fun!",
+ "我的小火車在哪裡？":"Where is my toy train?",
+ "小火車嘟嘟嘟！":"The train goes choo choo!",
+ "棉花，我們去公園玩吧！":"Cotton, let's go to the park!",
+ "{n}，幫棉花打開門！":"{n}, help Cotton open the door!",
+ "出發囉！":"Let's go!",
+ "棉花和媽媽走路去公園。":"Cotton and Mommy walk to the park.",
+ "{n}，你看，學校在哪裡？":"{n}, look! Where is the school?",
+ "那是學校！等我長大就去上學！":"That's the school! When I grow up, I'll go to school!",
+ "到公園囉！":"We're at the park!",
+ "我想溜滑梯！{n}，溜滑梯在哪裡？":"I want to go down the slide! {n}, where is the slide?",
+ "咻！溜下來，好好玩！":"Whee! Down the slide. So fun!",
+ "{n}，幫棉花找到盪鞦韆！":"{n}, help Cotton find the swing!",
+ "盪高高，飛起來囉！":"Swing up high! I'm flying!",
+ "樹上有誰在吃果子？":"Who is eating a nut in the tree?",
+ "是松鼠！你好，松鼠！":"It's a squirrel! Hello, squirrel!",
+ "玩了一整天，棉花好累喔。晚安，棉花！晚安，{n}！":"Cotton played all day and is so tired. Good night, Cotton! Good night, {n}!",
+ "{n}好棒！你陪棉花過了開心的一天！":"Great job, {n}! You gave Cotton a happy day!",
+ "天黑了，棉花和媽媽回家囉。":"It's getting dark. Cotton and Mommy go home.",
+ "棉花，該準備睡覺囉！":"Cotton, time to get ready for bed!",
+ "{n}，幫棉花找到枕頭！":"{n}, help Cotton find the pillow!",
+ "枕頭軟軟的，好舒服！":"The pillow is soft. So comfy!",
+ "我要抱小熊睡覺！{n}，小熊在哪裡？":"I want to sleep with my teddy! {n}, where is the teddy bear?",
+ "小熊，我們一起睡覺吧！":"Teddy, let's go to sleep together!",
+ "{n}，棉花的床在哪裡？":"{n}, where is Cotton's bed?",
+ "我躺好了，晚安！":"I'm all tucked in. Good night!",
+};/*EN_END*/
+const EN_PAT=[
+ [/^\{n\}，(.+)在哪裡？點點看！$/,m=>`{n}, where is the ${en1(m[1])}?`],
+ [/^答對了！這是(.+)！$/,m=>`Yes! That's the ${en1(m[1])}!`],
+ [/^這是(.+)喔。再找找(.+)在哪裡？$/,m=>`That's the ${en1(m[1])}. Where is the ${en1(m[2])}?`],
+ [/^\{n\}好棒！(.+)的東西都找到了！下一站：(.+)！$/,m=>`Great job, {n}! You found everything in the ${ROOM_EN[m[1]]}. Next stop: the ${ROOM_EN[m[2]]}!`],
+ [/^解鎖新關卡！(.+)有更多東西可以找囉！$/,m=>`New level unlocked! More things to find in the ${ROOM_EN[m[1]]}!`],
+ [/^\{n\}好棒！(.+)的東西都找到了！$/,m=>`Great job, {n}! You found everything in the ${ROOM_EN[m[1]]}!`],
+];
+function toEn(t){ const nm=N(), key=String(t).split(nm).join("{n}"); let e=EN_FIXED[key];
+  if(!e) for(const [re,f] of EN_PAT){ const m=key.match(re); if(m){ e=f(m); break; } }
+  return e?e.split("{n}").join(nm):null; }
+// what the child sees for a Chinese line in the chosen mode
+function show(t){ const L=LANG(); return L==="cn"?toS(t):L==="en"?(toEn(t)||toS(t)):t; }
+function showWho(w){ const L=LANG(); return L==="en"?(WHO_EN[w]||w):L==="cn"?toS(w):w; }
+function enChunks(t){ const nm=N(), out=[];
+  String(t).split(nm).forEach((part,i)=>{ if(i) out.push(nm);
+    part.split(/(?<=[.!?])\s+/).forEach(c=>{ c=c.replace(/^[,\s]+|[,\s]+$/g,""); if(c&&!/^[.!?,\s]+$/.test(c)) out.push(c); }); });
+  return out; }
+// menus and labels
+function applyLangUI(){ const L=LANG();
+  const T3=(tw,en)=>L==="en"?en:L==="cn"?toS(tw):tw;
+  $("mFree").innerHTML=`<span class="big">🏡</span>${T3("棉花的家","Cotton's Home")}<small>${T3("自由探索","Free play")}</small>`;
+  $("mStory").innerHTML=`<span class="big">🗺️</span>${T3("故事冒險","Story")}<small>${T3("關卡遊戲","Adventure")}</small>`;
+  $("mBook").innerHTML=`<span class="big">⭐</span>${T3("成長紀錄","My Words")}<small>${T3("學會的字","What I learned")}</small>`;
+  $("mPaint").innerHTML=`<span class="big">🎨</span>${T3("魔法畫室","Magic Studio")}<small>${T3("畫畫、上色","Draw & color")}</small>`;
+  $("paintTitle").textContent=T3("魔法畫室","Magic Studio"); $("paintSub").textContent=T3("想畫在哪裡？","Where do you want to draw?");
+  document.querySelector(".title .zh").textContent=T3("小棉花的冒險日記","Cotton's Adventure Diary");
+  $("ribName").parentNode.innerHTML=L==="en"?`<b id="ribName"></b>, come play at Cotton's house!`:`<b id="ribName"></b>${T3("，一起來棉花家玩！","")}`;
+  $("ribName").textContent=N();
+  document.querySelectorAll("[data-lang]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.lang===L)); }
+
+// ---------- rooms: tap spots are % boxes over the painted objects [key,x,y,w,h] ----------
+// 四個關卡（每個房間各自過關）：第 1 關 12 樣 → 第 2 關 20 樣 → 第 3 關全部，用另一種語言考 → 第 4 關聽提示找東西
+const STAGE_KEYS={
+  door:{1:["door","car","dog","ball","bird","bike","butterfly","tree","window","mailbox","bench","squirrel"],
+        2:["door","car","dog","ball","bird","bike","butterfly","tree","window","mailbox","bench","teddy","squirrel","sakura","roof","dragonfly","lamp","bunnydoll","stairs","pinwheel"]},
+  living:{1:["ball","train","sofa","cat","dog","storybook","apple","blocks","clock","cup","horse","cookie"],
+          2:["ball","train","sofa","cat","dog","storybook","apple","blocks","clock","cup","horse","window","cookie","bunnydoll","globe","books","teapot","table","flower","rings"]},
+  kitchen:{1:["apple","banana","bread","cup","strawberry","bowl","chair","cookie","fridge","kettle","table","oven"],
+           2:["apple","banana","bread","cup","strawberry","bowl","chair","cookie","fridge","kettle","table","flower","window","oven","sink","stove","toaster","jam","towel","lunchbox"]},
+  bath:{1:["duck","towel","toothbrush","bubble","tub","mirror","slippers","barsoap","sink","shampoo","sponge","flower"],
+        2:["duck","towel","toothbrush","bubble","tub","mirror","slippers","barsoap","sink","shampoo","window","flower","sponge","brush","plant","shower","curtain","soap","stool","laundry"]},
+  bedroom:{1:["bed","pillow","teddy","backpack","airplane","storybook","cup","window","bunnydoll","desk","chair","door"],
+           2:["bed","pillow","teddy","backpack","airplane","storybook","cup","window","bunnydoll","basket","desk","chair","door","wardrobe","lantern","globe","nightlight","blanket","hat","cushion"]},
+  park:{1:["slide","swing","squirrel","ball","duck","tree","butterfly","apple","sandbox","bucket","tricycle","bird"],
+        2:["slide","swing","squirrel","ball","duck","tree","butterfly","apple","sandbox","bucket","tricycle","bench","pond","bird","sailboat","cloud","sandcastle","hat","cookie","bunnydoll"]},
+};
+const LEVEL_NAME=["","小小探索家","好奇發現家","棉花冒險家","聲音小偵探"], MAXLV=4;
+const LV=r=>Math.min(MAXLV,Math.max(1,(PROG.lv&&PROG.lv[r.id])||1));
+const stars=r=>"⭐".repeat(LV(r))+"☆".repeat(MAXLV-LV(r));
+function roomSpots(r){ const st=LV(r), keys=STAGE_KEYS[r.id]&&STAGE_KEYS[r.id][st]; return keys?r.spots.filter(s=>keys.includes(s[0])):r.spots; }
+const ROOMS=[
+  {id:"door",name:"門口",who:"旁白",img:"img/room-door3.webp",
+   intro:n=>`${n}，這裡是棉花的家！點一下門，看看誰在家？`,
+   spots:[["tree",0,0,26,48],["sakura",80,0,20,38],["roof",24,4,30,24],["chimney",61,0,8,19],["bird",36,1,6,8],["squirrel",13,10,6,8],["birdhouse",7,29,7,15],
+          ["butterfly",20,41,5,7],["dragonfly",73,8,6,7],["window",38,41,15,17],["door",60,38,7,26],["lamp",90,11,8,74],["car",1,62,29,32],["bike",30,69,13,18],
+          ["dog",40,80,8,8],["mailbox",48,62,6,27],["bunnydoll",56,70,6,18],["stairs",61,65,11,13],["bench",77,57,13,17],["teddy",81,55,6,10],
+          ["ball",70,77,7,10],["pinwheel",79,72,6,11],["wateringcan",84,76,7,11],["sidewalk",30,90,55,9]],
+   chars:[], cotton:null},
+  {id:"living",name:"客廳",img:"img/room-living3.webp",
+   intro:n=>`${n}，快進來客廳！我們來玩玩具！`,
+   spots:[["window",35,0,28,35],["clock",73,1,9,19],["picture",71,21,10,14],["globe",13,15,7,15],["lantern",15,33,5,13],["books",6,17,8,28],["desklamp",22,16,10,24],
+          ["sofa",29,35,42,33],["blanket",24,45,9,21],["bunnydoll",39,38,7,17],["cat",46,44,7,11],["dog",53,44,9,12],["plant",69,37,9,14],["flower",89,23,9,20],
+          ["cabinet",79,43,19,20],["horse",80,52,17,26],["rings",73,57,7,17],["basket",2,52,16,28],["rug",10,86,80,13],["table",34,70,31,14],["train",17,72,15,16],
+          ["storybook",25,83,22,15],["vase",45,58,7,15],["cup",38,65,5,9],["cookie",42,72,8,6],["apple",52,67,4,7],["teapot",54,60,8,13],["blocks",64,69,15,23],["ball",80,76,7,13]],
+   chars:[], cotton:[92,1,26,"stand"]},
+  {id:"kitchen",name:"廚房",who:"媽媽",img:"img/room-kitchen3.webp",
+   intro:n=>`肚子餓了！媽媽準備了早餐，${n}，看看桌上有什麼？`,
+   spots:[["window",47,0,24,33],["jar",16,0,14,11],["picture",31,2,7,13],["fridge",0,15,19,71],["towel",7,47,7,18],["fruitbasket",19,29,10,15],["blender",29,26,6,17],
+          ["toaster",35,30,8,13],["plant",44,31,7,11],["faucet",55,30,4,12],["soap",63,32,3,9],["spatula",69,17,10,16],["pan",81,32,8,11],["kettle",89,27,8,16],
+          ["stove",78,41,19,9],["sink",48,41,18,9],["oven",78,52,16,20],["stool",82,73,15,17],["chair",67,56,15,42],["table",25,72,49,26],["bread",30,55,12,16],
+          ["flower",39,45,10,18],["jam",40,64,5,11],["strawberry",46,62,8,10],["bowl",52,56,8,10],["lunchbox",61,54,8,16],["cup",60,65,5,8],["banana",51,69,6,8],
+          ["apple",56,71,4,6],["cookie",43,73,9,6]],
+   chars:[], cotton:[23,0,30,"eat"]},
+  {id:"bath",name:"浴室",img:"img/room-bath3.webp",
+   intro:n=>`吃飽了，${n}，我們來洗手、刷刷牙！`,
+   spots:[["plant",0,0,10,45],["window",30,0,23,30],["flower",31,18,7,11],["shower",56,1,10,37],["curtain",65,0,11,65],["mirror",81,0,19,34],["towel",12,27,12,23],
+          ["tub",28,40,38,30],["bubble",33,33,9,9],["duck",50,38,6,9],["toothbrush",79,27,6,13],["soap",85,32,4,10],["sink",75,40,25,15],["cabinet",76,55,23,28],
+          ["stool",60,59,14,20],["slippers",69,80,16,12],["rug",34,74,34,21],["laundry",2,53,18,25],["basket",21,62,15,15],["shampoo",23,57,10,13],
+          ["sponge",10,74,7,10],["brush",18,76,12,12],["barsoap",11,85,9,7]],
+   chars:[], cotton:[50,2,30,"wash"]},
+  {id:"bedroom",name:"房間",img:"img/room-bedroom.webp",
+   intro:n=>`${n}，歡迎來到棉花的房間！這是我睡覺的地方喔！`,
+   spots:[["rug",13,86,70,14],["bed",5,28,38,45],["table",31,64,30,25],["bookshelf",56.5,19,13.5,40],["door",88,9,12,59],["wardrobe",70,16,13,45],
+          ["desk",35,38,22,20],["window",36,6,21,31],["plant",0,9,7,22],["books",6,12,6,10],["globe",11,8,5.5,14],["picture",19,12,8,16],
+          ["chair",42,36,8,20],["desklamp",49,24,7,15],["pencils",36.5,31,3,7],["sailboat",58,12,4.5,9],["teddy",64,22,5,8],["jar",64,41,4.5,8],
+          ["hat",83,36,4.5,12],["nightstand",0,47,10,21],["nightlight",4.5,41,3,7],["pillow",7,35,7,12],["bunnydoll",14,36,7,11],["blanket",18,44,20,26],
+          ["backpack",1,61,14,27],["storybook",38,66,14,8],["cup",44,59,5,8],["lantern",48.5,52,5,15],["airplane",52.5,63,7,8],
+          ["basket",62,53,13,22],["cushion",20,73,13,13]],
+   chars:[], cotton:[90,4,24,"stand"]},
+  {id:"park",name:"公園",who:"媽媽",img:"img/room-park3.webp",
+   intro:n=>`媽媽帶棉花去公園玩囉！${n}，你看公園裡有什麼？`,
+   spots:[["tree",0,15,12,45],["birdhouse",3,6,11,18],["bird",8,14,5,6],["squirrel",20,6,8,12],["lantern",30,9,5,15],["butterfly",38,18,5,8],["dragonfly",47,10,6,8],
+          ["cloud",56,2,14,10],["mountain",37,25,14,8],["flag",66,9,4,7],["sakura",80,0,20,25],["swing",12,25,25,31],["slide",52,16,23,39],["fence",38,36,13,7],
+          ["bench",80,36,18,17],["hat",88,40,5,7],["lamp",5,45,6,25],["tricycle",41,48,12,17],["ball",34,56,6,8],["pinwheel",59,53,6,17],["sandbox",8,64,34,16],
+          ["sandcastle",20,55,6,12],["bucket",13,62,5,10],["shovel",28,61,3,8],["hopscotch",42,68,15,30],["chalk",53,89,5,4],["picnic",6,73,11,16],["apple",14,85,4,7],
+          ["bottle",17,80,3,12],["bunnydoll",20,78,8,16],["cookie",29,85,6,6],["pond",72,63,28,22],["duck",83,72,5,10],["sailboat",85,56,7,15],["pot",60,73,7,17],
+          ["wateringcan",66,83,12,12]],
+   chars:[], cotton:[70,38,20,"hop"]},
+];
+// ---------- 棉花 poses (the user's explorer sheet) ----------
+const SHEETS=[
+  {src:"img/cotton-poses.webp",outfit:"explore",poses:{stand:[24,18,378,488], side:[402,14,424,492], happy:[842,14,330,492], look:[1176,14,350,492], hop:[388,524,404,484], map:[792,532,372,484], hug:[1162,532,366,484]}},
+  {src:"img/cotton-poses-2.webp",outfit:"explore",poses:{stand:[0,0,512,512], side:[512,0,512,512], happy:[1024,0,512,512], hop:[0,512,512,512], map:[512,512,512,512], hug:[1024,512,512,512]}},
+  {src:"img/cotton-poses-3.webp",outfit:"explore",poses:{stand:[0,0,512,512], side:[512,0,512,512], happy:[1024,0,512,512], hop:[0,512,512,512], hug:[512,512,512,512], map:[1024,512,512,512]}},
+  // 棉花 at home, no clothes
+  {src:"img/cotton-home.webp",outfit:"home",poses:{stand:[0,0,310,345], stand2:[305,0,310,345], side:[610,0,320,345],
+    sleep:[0,380,300,300], rest:[300,380,300,300], rest2:[590,380,230,300], wash:[825,340,235,340], wash2:[1060,340,235,340], look:[1290,340,246,340],
+    hop:[0,680,340,344], eat:[345,680,300,344], eat2:[650,680,300,344], happy:[930,680,300,344], hug:[1230,680,306,344]}},
+  {src:"img/cotton-poses-4.webp",outfit:"explore",poses:{stand:[0,0,400,512], side:[384,0,410,512], happy:[790,0,380,512], look:[1170,0,366,512], hop:[370,512,430,512], map:[790,512,380,512], hug:[1160,512,376,512]}},
+];
+const POOLS={explore:{},home:{}}; let OUTFIT="home";
+const base=n=>n.replace(/\d+$/,"");
+const anyPose=(...names)=>{ const P=POOLS[OUTFIT]; let all=names.flatMap(n=>P[n]||[]); if(!all.length) all=Object.values(P).flat();
+  return all[Math.floor(Math.random()*all.length)]; };
+const MOODS=["stand","side","happy","look","hop","map","hug"], HOME_MOODS=["stand","side","happy","look","hop","eat","hug","wash","rest"];
+let hubT=null;
+// 棉花 hops and switches to a different painted pose
+function cheer(){ const p=$("pl"); if(p){ p.classList.remove("hop"); p.offsetWidth; p.classList.add("hop"); } }
+function swapCotton(names){ names=names||(OUTFIT==="home"?HOME_MOODS:MOODS); cheer(); const el=$("cot"); if(!el) return; let s, tries=0;
+  do{ s=anyPose(...names); }while(s&&s.url===el.src&&++tries<6);
+  if(s) el.src=s.url; el.classList.remove("hop"); el.offsetWidth; el.classList.add("hop"); }
+
+// ---------- saved state (this device only) ----------
+const ME={name:"",age:2,g:""}, PROG={story:0,words:[],lv:{}};
+try{ Object.assign(ME,JSON.parse(localStorage.getItem("bc-me")||"{}")); Object.assign(PROG,JSON.parse(localStorage.getItem("bc-prog")||"{}")); }catch(e){}
+function save(){ try{ localStorage.setItem("bc-me",JSON.stringify(ME)); localStorage.setItem("bc-prog",JSON.stringify(PROG)); }catch(e){} }
+const N=()=>ME.name||"小朋友";
+
+// ---------- images ----------
+const IMG={};
+function load(src){ return new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src; }); }
+function cutout(img,rect){
+  const [sx,sy,sw,sh]=rect||[0,0,img.naturalWidth,img.naturalHeight];
+  const c=document.createElement("canvas"); c.width=sw; c.height=sh; const x=c.getContext("2d");
+  x.drawImage(img,sx,sy,sw,sh,0,0,sw,sh); const im=x.getImageData(0,0,sw,sh), d=im.data, NN=sw*sh;
+  const bg=new Uint8Array(NN), isW=i=>{const r=d[i*4],g=d[i*4+1],b=d[i*4+2]; return r>=247&&g>=245&&b>=241&&Math.max(r,g,b)-Math.min(r,g,b)<=9;};
+  const st=[]; for(let i=0;i<sw;i++) st.push(i,(sh-1)*sw+i); for(let j=0;j<sh;j++) st.push(j*sw,j*sw+sw-1);
+  while(st.length){const p=st.pop(); if(bg[p]||!isW(p)) continue; bg[p]=1; const px=p%sw,py=(p-px)/sw;
+    if(px>0)st.push(p-1); if(px<sw-1)st.push(p+1); if(py>0)st.push(p-sw); if(py<sh-1)st.push(p+sw);}
+  const lab=new Int32Array(NN); let best=0,bestN=0,cur=0;
+  for(let p=0;p<NN;p++){ if(bg[p]||lab[p]) continue; cur++; let n=0; const q=[p]; lab[p]=cur;
+    while(q.length){const a=q.pop(); n++; const ax=a%sw,ay=(a-ax)/sw;
+      for(const b of [ax>0?a-1:-1,ax<sw-1?a+1:-1,ay>0?a-sw:-1,ay<sh-1?a+sw:-1]) if(b>=0&&!bg[b]&&!lab[b]){lab[b]=cur;q.push(b);}}
+    if(n>bestN){bestN=n;best=cur;} }
+  let x0=sw,y0=sh,x1=0,y1=0;
+  for(let p=0;p<NN;p++){ if(lab[p]!==best){d[p*4+3]=0;continue;} const px=p%sw,py=(p-px)/sw;
+    if(px<x0)x0=px; if(px>x1)x1=px; if(py<y0)y0=py; if(py>y1)y1=py;
+    if((px>0&&lab[p-1]!==best)||(px<sw-1&&lab[p+1]!==best)||(py>0&&lab[p-sw]!==best)||(py<sh-1&&lab[p+sw]!==best)) d[p*4+3]=120; }
+  x.putImageData(im,0,0);
+  const o=document.createElement("canvas"); o.width=x1-x0+1; o.height=y1-y0+1;
+  o.getContext("2d").drawImage(c,x0,y0,o.width,o.height,0,0,o.width,o.height);
+  return {url:o.toDataURL("image/png"),w:o.width,h:o.height};
+}
+const SPR={};
+async function loadAll(){
+  for(const sh of SHEETS.filter(x=>x.outfit==="home")){ const img=await load(sh.src), k=img.naturalWidth/1536;
+    const P=POOLS[sh.outfit]; for(const [n,r] of Object.entries(sh.poses)){ const b=base(n); (P[b]=P[b]||[]).push(cutout(img,r.map(v=>Math.round(v*k)))); } }
+  for(const n in POOLS.home) SPR[n]=POOLS.home[n][0]; for(const n in POOLS.explore) SPR[n]=SPR[n]||POOLS.explore[n][0];
+  SPR.mom=cutout(await load("img/mom.webp")); SPR.dad=cutout(await load("img/dad.webp"));
+  SPR.duck=cutout(await load("img/duck.webp")); SPR.frog=cutout(await load("img/frog.webp"));
+  IMG.walk=await load("img/walk.webp"); IMG.family=await load("img/family.webp");
+  SPR.girl=cutout(await load("img/player-girl.webp")); SPR.boy=cutout(await load("img/player-boy.webp"));
+  for(const r of ROOMS) IMG[r.id]=await load(r.img);
+}
+// a close-up of a painted object, used on the word card and in the record book
+const THUMB={};
+function thumb(roomId,[k,x,y,w,h]){
+  const key=roomId+k; if(THUMB[key]) return THUMB[key];
+  const im=IMG[roomId], W0=im.naturalWidth, H0=im.naturalHeight;
+  const pad=.12, sx=Math.max(0,(x-w*pad)/100*W0), sy=Math.max(0,(y-h*pad)/100*H0);
+  const sw=Math.min(W0-sx,w*(1+2*pad)/100*W0), sh=Math.min(H0-sy,h*(1+2*pad)/100*H0);
+  const c=document.createElement("canvas"), s=Math.min(1,360/Math.max(sw,sh)); c.width=sw*s; c.height=sh*s;
+  c.getContext("2d").drawImage(im,sx,sy,sw,sh,0,0,c.width,c.height);
+  return THUMB[key]=c.toDataURL("image/jpeg",.85);
+}
+
+// ---------- stage fits a 16:9 painting inside the window ----------
+function fit(){ const a=$("app").getBoundingClientRect(); let w=a.width,h=w*9/16; if(h>a.height){h=a.height;w=h*16/9;}
+  Object.assign($("stage").style,{width:w+"px",height:h+"px",left:(a.width-w)/2+"px",top:(a.height-h)/2+"px"}); }
+window.addEventListener("resize",()=>{ fit(); if(typeof sizeCanvas==="function") sizeCanvas(); }); fit();
+
+// ---------- sound ----------
+// Voices: prefer the device's higher-quality voices; a parent can pick another in Settings.
+let muted=false, zhV=null, enV=null, ZH=[], EN=[];
+const vScore=v=>(/premium|enhanced|高音質|natural|neural/i.test(v.name)?6:0)+(/siri/i.test(v.name)?5:0)+(/google/i.test(v.name)?4:0)+(/zh[-_]TW|en[-_]US/i.test(v.lang)?2:0)+(v.localService?0:1);
+function pick(){ let v=[]; try{ v=speechSynthesis.getVoices(); }catch(e){}
+  // Apple's "Eloquence" voices are often silent inside Chrome-based apps, so leave them out
+  const flaky=/^(Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley)\b/i;
+  ZH=v.filter(x=>/^(zh|cmn)/i.test(x.lang)&&!flaky.test(x.name)).sort((a,b)=>vScore(b)-vScore(a));
+  const silly=/^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Junior|Ralph|Fred|Kathy)\b/i;
+  EN=v.filter(x=>/^en/i.test(x.lang)&&!silly.test(x.name)&&!flaky.test(x.name)).sort((a,b)=>vScore(b)-vScore(a)+(/^Samantha/.test(b.name)?3:0)-(/^Samantha/.test(a.name)?3:0));
+  zhV=ZH.find(x=>x.name===ME.zhVoice)||ZH[0]||null; enV=EN.find(x=>x.name===ME.enVoice)||EN[0]||null; fillVoices(); }
+function fillVoices(){ const z=$("vZh"), e=$("vEn"); if(!z) return;
+  z.innerHTML=ZH.map(v=>`<option ${v===zhV?"selected":""}>${v.name}</option>`).join("")||"<option>（這台裝置沒有中文聲音）</option>";
+  e.innerHTML=EN.map(v=>`<option ${v===enV?"selected":""}>${v.name}</option>`).join("")||"<option>（這台裝置沒有英文聲音）</option>"; }
+// Voice: every line is pre-recorded into audio/voice.m4a (index in audio/voice.json) and played
+// like music, so it works even where the browser can't speak. Only a child's own name, which can't be
+// recorded ahead of time, falls back to the browser voice.
+let speakId=0, curSrc=null;
+// Each character has their own voice so a child can tell who is talking:
+// 棉花 = the voice picked on the start screen, played a little higher so it sounds younger;
+// 旁白 and 媽媽 get the other two voices.
+const VOICES={
+  zh:[["zh-yukid","曉雨（小朋友）"],["zh-yu","曉雨"],["zh-chen","曉臻"],["zh-chenkid","曉臻（小朋友）"],["zh-jhe","雲哲（男生）"]],
+  en:[["en-ana","Ana（小女孩）"],["en-emma","Emma"],["en-jenny","Jenny"],["en-andrew","Andrew（男生）"]]};
+const ROLES=[["棉花","zh-yukid","en-ana","你好，我是棉花！"],["媽媽","zh-chen","en-jenny","媽媽帶棉花去公園玩囉！"],["旁白","zh-jhe","en-andrew","大樹的葉子綠綠的。"]];
+const PACK_CACHE={};
+function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{})[r[0]]||{};
+  const ok=(lang,id)=>VOICES[lang].some(x=>x[0]===id);
+  return {zh:ok("zh",v.zh)?v.zh:r[1], en:ok("en",v.en)?v.en:r[2]}; }
+// Phones run out of memory if whole voice packs are decoded (hours of audio = GBs).
+// Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
+const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
+function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
+// Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
+function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);
+  const box=(s,e,name)=>{ for(let o=s;o+8<=e;){ let sz=u32(o), h=8; if(sz===1){ sz=Number(v.getBigUint64(o+8)); h=16; } else if(sz===0) sz=e-o;
+      if(String.fromCharCode(d[o+4],d[o+5],d[o+6],d[o+7])===name) return [o+h,o+sz]; o+=sz; } return null; };
+  let m=box(0,d.length,"moov"); for(const n of ["trak","mdia","minf","stbl"]) m=box(m[0],m[1],n); const [s0,s1]=m;
+  const sz=box(s0,s1,"stsz"), sc=box(s0,s1,"stsc"), co=box(s0,s1,"stco")||box(s0,s1,"co64"), is64=!box(s0,s1,"stco");
+  const fixed=u32(sz[0]+4), n=u32(sz[0]+8), sizes=[]; for(let i=0;i<n;i++) sizes.push(fixed||u32(sz[0]+12+i*4));
+  const nc=u32(co[0]+4), chunks=[]; for(let i=0;i<nc;i++) chunks.push(is64?Number(v.getBigUint64(co[0]+8+i*8)):u32(co[0]+8+i*4));
+  const ns=u32(sc[0]+4), runs=[]; for(let i=0;i<ns;i++) runs.push([u32(sc[0]+8+i*12)-1,u32(sc[0]+12+i*12)]);
+  const off=[]; let k=0; for(let r=0;r<runs.length;r++){ const [first,per]=runs[r], last=r+1<runs.length?runs[r+1][0]:nc;
+    for(let c=first;c<last;c++){ let o=chunks[c]; for(let j=0;j<per&&k<n;j++,k++){ off.push(o); o+=sizes[k]; } } }
+  return {off,sizes}; }
+function adts(P,f0,f1){ let tot=0; for(let i=f0;i<f1;i++) tot+=P.sizes[i]+7; const out=new Uint8Array(tot); let o=0;
+  for(let i=f0;i<f1;i++){ const L=P.sizes[i]+7; out.set([0xFF,0xF1,(1<<6)|(6<<2),(1<<6)|(L>>11),(L>>3)&0xFF,((L&7)<<5)|0x1F,0xFC],o);
+    out.set(P.d.subarray(P.off[i],P.off[i]+P.sizes[i]),o+7); o+=L; } return out.buffer; }   // AAC-LC, 24 kHz, mono
+async function loadVoice(pack){ if(PACK_CACHE[pack]) return PACK_CACHE[pack];
+  const job=(async()=>{ try{ const d=new Uint8Array(await (await fetch(`audio/${pack}.mp4`)).arrayBuffer()); return Object.assign({d},mp4Frames(d)); }
+    catch(e){ delete PACK_CACHE[pack]; return null; } })();
+  PACK_CACHE[pack]=job; return job; }
+async function getClip(pack,[off,dur]){ const k=pack+"@"+off; if(CLIP_CACHE.has(k)){ const c=CLIP_CACHE.get(k); CLIP_CACHE.delete(k); CLIP_CACHE.set(k,c); return c; }
+  const P=await loadVoice(pack); if(!P) return null;
+  const n=P.sizes.length, s0=off*SR+PRIME, s1=(off+dur)*SR+PRIME;
+  const f0=Math.max(0,Math.floor(s0/1024)-3), f1=Math.min(n,Math.ceil(s1/1024)+3);
+  ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+  const slice=adts(P,f0,f1);
+  const b=await new Promise((res,rej)=>{ const p=ac.decodeAudioData(slice,res,rej); if(p&&p.then) p.then(res,rej); });
+  const trim=Math.max(0,(f1-f0)*1024/SR-b.duration);   // some decoders drop the first samples of a stream
+  const c={b,off:Math.max(0,(s0-f0*1024)/SR-trim),dur};
+  CLIP_CACHE.set(k,c); if(CLIP_CACHE.size>120) CLIP_CACHE.delete(CLIP_CACHE.keys().next().value);
+  return c; }
+function loadAllVoices(){ ROLES.forEach(([who])=>{ const c=cast(who); ["","-x","-y","-z"].forEach(x=>{ loadIdx(c.zh+x); loadIdx(c.en+x); }); }); }
+// Settings: each character picks a Chinese and an English voice; 試聽 plays a sample
+function drawVoices(){ const opt=(lang,cur)=>VOICES[lang].map(([id,n])=>`<option value="${id}" ${id===cur?"selected":""}>${n}</option>`).join("");
+  $("packs").innerHTML=ROLES.map(([who])=>{ const c=cast(who); return `<div class="vrow"><b>${who}</b>
+    <select data-who="${who}" data-lang="zh" aria-label="${who}的中文聲音">${opt("zh",c.zh)}</select>
+    <select data-who="${who}" data-lang="en" aria-label="${who}的英文聲音">${opt("en",c.en)}</select>
+    <button class="pick" type="button" data-try="${who}">試聽</button></div>`; }).join(""); }
+drawVoices();
+$("packs").addEventListener("change",e=>{ const sel=e.target.closest("select"); if(!sel) return;
+  ME.voices=ME.voices||{}; const w=sel.dataset.who; ME.voices[w]=Object.assign(cast(w),ME.voices[w]||{},{[sel.dataset.lang]:sel.value}); save();
+  ["","-x","-y","-z"].forEach(x=>loadIdx(sel.value+x)); });
+$("packs").addEventListener("click",e=>{ const b=e.target.closest("[data-try]"); if(!b) return; unlockAudio(); muted=false;
+  const r=ROLES.find(x=>x[0]===b.dataset.try); speak([[r[3],"zh"],["Hello! I am Cotton. Banana, apple, milk!","en"]],r[0]); });
+function zhChunks(t){ const nm=N(), out=[];
+  t.split(nm).forEach((part,i)=>{ if(i) out.push(nm);
+    part.split(/(?<=[！？。])/).forEach(c=>{ c=c.replace(/^[，、 ]+|[，、 ]+$/g,""); if(c&&!/^[！？。，、\s]+$/.test(c)) out.push(c); }); });
+  return out; }
+function playClip(buf,[off,dur],rate){ return new Promise(res=>{ try{ if(ac.state!=="running") ac.resume();
+  const s=ac.createBufferSource(); s.buffer=buf; s.playbackRate.value=rate; s.connect(ac.destination); s.onended=()=>res(); curSrc=s; s.start(0,off,dur);
+  setTimeout(res,(dur/rate+.6)*1000); }catch(e){ res(); } }); }
+function browserSay(t,l){ return new Promise(res=>{ const S=window.speechSynthesis; if(!S) return res();
+  try{ const u=new SpeechSynthesisUtterance(t); u.lang=l==="en"?"en-US":"zh-TW"; const v=l==="en"?enV:zhV; if(v){u.voice=v;u.lang=v.lang;}
+    u.rate=.72; u.onend=u.onerror=()=>res(); S.speak(u); setTimeout(res,900+t.length*420); }catch(e){ res(); } }); }
+// next steps wait for the current sentence to finish instead of a fixed timer
+let lastSpeech=Promise.resolve();
+const afterSpeech=(fn,ms=600,always=false)=>{ const p=lastSpeech; p.then(()=>{ if(always||p===lastSpeech) setTimeout(fn,ms); }); };
+function speak(parts,who){ lastSpeech=speakNow(parts,who); return lastSpeech; }
+async function speakNow(parts,who="旁白"){ if(muted) return; const id=++speakId;
+  try{ curSrc&&curSrc.stop(); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){}
+  const c=cast(who), packs=l=>["","-x","-y","-z"].map(x=>(l==="en"?c.en:c.zh)+x);
+  const idx={}; await Promise.all([...packs("zh"),...packs("en")].map(async p=>{ idx[p]=await loadIdx(p); })); if(id!==speakId) return;
+  const seq=[]; parts.forEach(([t,l],pi)=>{ (l==="en"?enChunks(t):zhChunks(t)).forEach(c=>seq.push([l,c,pi])); });
+  const find=(l,t)=>packs(l).find(p=>idx[p]&&idx[p][l+"|"+t]);
+  const clips=seq.map(([l,t])=>{ const p=find(l,t); return p?getClip(p,idx[p][l+"|"+t]).catch(()=>null):null; });  // fetch/decode all lines up front
+  const rest=ms=>new Promise(r=>setTimeout(r,ms)); let prev=null;
+  for(const [i,[l,t,pi]] of seq.entries()){ if(id!==speakId||muted) return;
+    if(prev!==null) await rest(pi!==prev?900:350); prev=pi; if(id!==speakId||muted) return;
+    const C=clips[i]&&await clips[i]; if(id!==speakId||muted) return;
+    if(C) await playClip(C.b,[C.off,C.dur],1);
+    else if(t===N()) continue;   // a name with no recording is shown, not spoken, so the voice never switches mid-sentence
+    else await browserSay(t,l); } }
+// iPhone/iPad only allow speech after a tap: say something tiny inside the first tap
+function unlockAudio(){ try{ const u=new SpeechSynthesisUtterance(" "); u.volume=0; speechSynthesis.speak(u); }catch(e){}
+  try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); ac.resume&&ac.resume(); }catch(e){} }
+let ac=null; function tone(fs,d=.12){ if(muted) return; try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+  fs.forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*d; o.type="sine"; o.frequency.value=f;
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.2,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+d*1.8);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t+d*2); }); }catch(e){} }
+const ding=()=>tone([1047,1568],.1), yay=()=>tone([523,659,784,1047,1319],.14), oops=()=>tone([392,330],.12);
+$("sndBtn").onclick=()=>{ muted=!muted; $("sndBtn").textContent=muted?"🔇":"🔊"; if(muted) try{speechSynthesis.cancel();}catch(e){} };
+
+let lastSay="";
+let lastWho="旁白";
+function sayParts(text){ const e=LANG()==="en"&&toEn(text); return e?[[e,"en"]]:[[text,"zh"]]; }
+let lastParts=null;
+function sayAs(shown,parts,who="旁白"){ lastSay=null; lastParts=parts; lastWho=who; $("line").textContent=shown; $("who").textContent=showWho(who); $("who").dataset.who=who; $("sayBox").hidden=false; speak(parts,who); }
+function say(text,who="棉花"){ lastParts=null; lastSay=text; lastWho=who; $("line").textContent=show(text); $("who").textContent=showWho(who); $("who").dataset.who=who; $("sayBox").hidden=false; speak(sayParts(text),who); }
+$("replay").onclick=()=>speak(lastParts||sayParts(lastSay),lastWho);
+
+// ---------- word card ----------
+let cardT=null, cardId=0;
+function showCard(k,src,who="旁白"){
+  const [zh,zy,en,fact,py,factEn,zhS,factS]=k==="me"?[N(),"","Me",`我是${N()}，我是棉花的好朋友！`,"","I'm Cotton's friend!",N(),`我是${N()}，我是棉花的好朋友！`]:W[k], little=ME.age<=3, L=LANG();
+  $("cImg").src=src; let spoken;
+  if(L==="en"){ $("cZy").textContent=""; $("cZh").textContent=en; $("cEn").textContent=`${zhS}  ${py}`;
+    $("card").hidden=false; ding(); spoken=speak([[en,"en"],[zh,"zh"],[zh,"zh"]],who); $("line").textContent=factEn; }
+  else { const cn=L==="cn"; $("cZh").textContent=cn?zhS:zh; $("cZy").textContent=little?"":(cn?py:zy); $("cEn").textContent=en;
+    $("card").hidden=false; ding(); spoken=speak([[zh,"zh"],[en,"en"],[fact,"zh"]],who); $("line").textContent=cn?factS:fact; }
+  spoken=spoken||Promise.resolve(); lastSay=fact;
+  if(k!=="me"&&!PROG.words.includes(k)){ PROG.words.push(k); save(); }
+  clearTimeout(cardT); const me=++cardId;
+  spoken.then(()=>{ if(me===cardId) cardT=setTimeout(()=>$("card").hidden=true,1500); }); }
+$("card").onclick=()=>{ $("card").hidden=true; clearTimeout(cardT); };
+
+// ---------- screens ----------
+const layer=$("layer");
+function clearStage(){ layer.innerHTML=""; $("paintBar").hidden=true; $("stage").classList.remove("paperbg","night"); $("sayBox").classList.remove("top"); drawing=null; $("bg").style.visibility=""; target=null; storyRun++; $("sayBox").classList.remove("hub"); clearInterval(hubT); $("hubUI").hidden=true; $("next").hidden=true; $("path").hidden=true; $("lvBadge").hidden=true; stopNudge(); }
+// the child playing, standing beside 棉花 (only once they picked boy or girl)
+function addPlayer(cx,bottom,h){ if(!ME.g||!SPR[ME.g]) return; const el=addChar("me",ME.g,cx,bottom,h); el.id="pl";
+  el.onclick=()=>{ cheer(); if(quiz) return; showCard("me",el.src); }; }
+function addChar(key,sprite,cx,bottom,h){ const s=key==="cotton"?(anyPose(sprite)||SPR[sprite]):SPR[sprite]; const el=document.createElement("img");
+  el.className="char"; el.src=s.url; el.alt=key==="me"?N():W[key][0]; el.dataset.w=key;
+  Object.assign(el.style,{left:cx+"%",bottom:bottom+"%",height:h+"%"}); layer.appendChild(el); return el; }
+
+function showHub(){
+  clearStage(); mode="hub"; OUTFIT="home"; $("bg").src="img/hub.webp"; $("hubUI").hidden=false; $("homeBtn").hidden=true;
+  applyLangUI(); $("sayBox").classList.add("hub");
+  const c=addChar("cotton","stand",52,22,50); c.id="cot"; c.classList.add("hop");
+  c.onclick=()=>{ swapCotton(); say(`嗨，${N()}！我是棉花，歡迎來我家玩！`); };
+  hubT=setInterval(()=>swapCotton(Math.random()<.2?["sleep"]:null),6000);
+  say(`嗨，${N()}！我是棉花！來看看我的家，認識好多好多東西吧！`);
+}
+let mode="hub", room=null, found=new Set(), quiz=null;
+function pathChips(){ $("path").innerHTML=ROOMS.map((r,i)=>`<span class="${i<PROG.story?"done":i===PROG.story&&mode==="story"&&r===room?"now":r===room?"now":i>PROG.story?"lock":""}">${i>PROG.story?"🔒 ":""}${roomName(r.name)}</span>`).join(""); $("path").hidden=false; }
+
+function openRoom(i,m){
+  clearStage(); mode=m; room=ROOMS[i]; quizDone=false; quiz=null; OUTFIT=room.outfit||"home"; found=new Set(); quiz=null; $("homeBtn").hidden=false;
+  $("bg").src=room.img;
+  roomSpots(room).forEach(s=>{ const b=document.createElement("button"); b.className="spot"; b.dataset.w=s[0];
+    b.setAttribute("aria-label",W[s[0]][0]); Object.assign(b.style,{left:s[1]+"%",top:s[2]+"%",width:s[3]+"%",height:s[4]+"%"});
+    b.onclick=()=>tapSpot(s,b); layer.appendChild(b); });
+  room.chars.forEach(([k,cx,bot,h])=>{ const el=addChar(k,k,cx,bot,h); el.onclick=()=>tapChar(k,el); });
+  if(room.cotton){ const [cx,bot,h,p]=room.cotton; const el=addChar("cotton",p,cx,bot,h); el.id="cot"; el.onclick=()=>tapChar("cotton",el); }
+  pathChips(); lvShow();
+  if(mode==="free"&&LV(room)===MAXLV){ say("聲音小偵探！聽聽看，找出是哪一樣東西！","旁白"); afterSpeech(()=>{ if(!quiz&&!quizDone&&mode==="free") startQuiz(); },700); return; }
+  say(room.intro(N()), room.who||"棉花"); idle();
+}
+function ping(el){ const r=el.getBoundingClientRect(), s=$("stage").getBoundingClientRect(), d=Math.max(r.width,r.height)*1.1;
+  const p=document.createElement("div"); p.className="ping"; Object.assign(p.style,{width:d+"px",height:d+"px",left:(r.left-s.left+r.width/2-d/2)+"px",top:(r.top-s.top+r.height/2-d/2)+"px"});
+  layer.appendChild(p); setTimeout(()=>p.remove(),900); }
+function lvShow(){ const b=$("lvBadge"); if(mode!=="free"||!room||!ROOMS.includes(room)){ b.hidden=true; return; }
+  const lv=LV(room), E=LANG()==="en";
+  const name=E?`Level ${lv}`:show(`第 ${lv} 關`)+` <span class="lvname">${show(LEVEL_NAME[lv])}</span>`;
+  const prog=quiz?(E?" · Quiz ":" · "+show("考試")+" ")+`<b>${quiz.total-quiz.left.length}/${quiz.total}</b>`:lv<MAXLV?` · <b>${found.size}/${countable()}</b>`:"";
+  b.innerHTML=`${stars(room)} ${name}${prog}`; b.hidden=false; }
+function countable(){ return roomSpots(room).length+room.chars.length; }
+function tapSpot(s,b){
+  if(mode==="story") return storyTap(s[0],b,()=>storySpotSrc(s));
+  idle(); ping(b);
+  if(quiz){ return answer(s[0],b); }
+  showCard(s[0],thumb(room.id,s)); b.classList.add("found"); found.add(s[0]); swapCotton(); lvShow();
+  if(room.id==="door"&&s[0]==="door"&&!$("cot")){ afterSpeech(()=>{ if($("cot")) return; const el=addChar("cotton","hop",61,2,38); el.id="cot"; el.classList.add("hop"); el.onclick=()=>tapChar("cotton",el);
+      say(`早安，${N()}！我是棉花！媽媽說今天要帶我出去玩！`); },300,true); }
+  check();
+}
+function tapChar(k,el){ if(mode==="story") return storyTap(k,el,()=>k==="cotton"?el.src:SPR[k].url);
+  idle(); el.classList.remove("hop"); el.offsetWidth; el.classList.add("hop");
+  if(quiz) return answer(k,el);
+  if(k==="cotton"){ swapCotton(); showCard(k,el.src,"棉花"); } else showCard(k,SPR[k].url,k==="mom"?"媽媽":"旁白");
+  if(k!=="cotton"){ found.add(k); } lvShow(); check(); }
+function check(){ if(mode==="free"&&found.size<countable()) return; if(found.size<countable()) return;
+  if(quiz||quizDone) return;
+  afterSpeech(()=>{ if(!quiz&&!quizDone) startQuiz(); },900); }
+// 找完全部之後：考考你，考過就解鎖下一關
+let quizDone=false;
+function startQuiz(){ const keys=[...new Set(roomSpots(room).map(s=>s[0]))].sort(()=>Math.random()-.5).slice(0,[0,8,10,12,10][LV(room)]); quiz={left:keys,total:keys.length}; askQ(); }
+function askQ(){ if(!quiz) return; if(!quiz.left.length){ quiz=null; quizDone=true; lvShow(); return roomDone(); } quiz.now=quiz.left[0]; lvShow(); askNow(); }
+// 第 3 關：用另一種語言問（中文模式問英文，English 模式問中文）；第 4 關：只給聲音提示
+function askNow(again){ const k=quiz.now, [zh,,en,fact,,factEn]=W[k], lv=LV(room), E=LANG()==="en";
+  if(lv===3){ if(E) sayAs(`${N()}，${zh}在哪裡？`,[[`${N()}，${zh}在哪裡？點點看！`,"zh"]]);
+              else { const q=`${N()}, where is the ${en.toLowerCase()}?`; sayAs(q,[[q,"en"]]); } return; }
+  if(lv===4){ const first=again?(E?"Listen again!":"再聽一次！"):(E?"Guess what it is!":"猜猜看，是什麼？");
+    sayAs("🔊 "+(E?first:show(first)),E?[[first,"en"],[factEn,"en"]]:[[first,"zh"],[fact,"zh"]]); return; }
+  say(`${N()}，${zh}在哪裡？點點看！`,"旁白"); }
+function answer(k,el){ if(k===quiz.now){ yay(); quiz.left.shift(); $("line").textContent=show(`答對了！這是${W[k][0]}！`); speak(LANG()==="en"?[[toEn(`答對了！這是${W[k][0]}！`),"en"],[W[k][0],"zh"]]:[[`答對了！這是${W[k][0]}！`,"zh"],[W[k][2],"en"]],"旁白"); afterSpeech(askQ,700); }
+  else { oops(); const lv=LV(room), E=LANG()==="en";
+    if(lv===4) return askNow(true);
+    if(lv===3){ if(E){ const z=`這是${W[k][0]}喔。再找找${W[quiz.now][0]}在哪裡？`; return sayAs(z,[[z,"zh"]]); }
+      const q=`That's the ${W[k][2].toLowerCase()}. Where is the ${W[quiz.now][2].toLowerCase()}?`; return sayAs(q,[[q,"en"]]); }
+    say(`這是${W[k][0]}喔。再找找${W[quiz.now][0]}在哪裡？`,"旁白"); } }
+function roomDone(){
+  yay(); petals(); stopNudge();
+  const i=ROOMS.indexOf(room);
+  if(mode==="story"){
+    if(PROG.story===i) PROG.story=i+1; save(); pathChips();
+    if(i===ROOMS.length-1){ say(`${N()}好棒！今天和棉花一起去了好多地方！`); afterSpeech(()=>finale(),800); return; }
+    say(`${N()}好棒！${room.name}的東西都找到了！下一站：${ROOMS[i+1].name}！`);
+    $("next").textContent=`下一站：${ROOMS[i+1].name} ▶`; $("next").hidden=false; $("next").onclick=()=>{ ding(); openRoom(i+1,"story"); };
+  } else {
+    say(`${N()}好棒！${room.name}的東西都找到了！`);
+    const lv=LV(room);
+    if(lv<MAXLV){ PROG.lv=PROG.lv||{}; PROG.lv[room.id]=lv+1; save();
+      afterSpeech(()=>{ cheer(); say(`解鎖新關卡！${room.name}有更多東西可以找囉！`); },700);
+      $("next").textContent=LANG()==="en"?"Next level ▶":show(`下一關：${LEVEL_NAME[lv+1]} ▶`); $("next").onclick=()=>{ ding(); openRoom(i,"free"); };
+    } else {
+      afterSpeech(()=>say("全部過關了！你是棉花冒險家！"),700);
+      $("next").textContent=LANG()==="en"?"Back to Cotton's home":show("回到棉花的家"); $("next").onclick=()=>{ ding(); showFree(); };
+    }
+    $("next").hidden=false;
+  }
+}
+function finale(){ $("doneHero").src=SPR.hug.url; $("doneTitle").textContent=`${N()}，故事冒險完成！`;
+  $("doneSub").textContent=`你和棉花一起學會了 ${PROG.words.length} 個字。下一次，我們去森林尋寶！`; $("done").hidden=false;
+  speak([[`${N()}好棒！故事冒險完成！下一次，我們去森林尋寶！`,"zh"]]); }
+$("doneBtn").onclick=()=>{ $("done").hidden=true; showHub(); };
+
+
+// ================= 故事冒險：棉花的一天 =================
+// Each scene: a background (a room, the family picture or the street), then small tasks:
+// someone asks for a thing, the child finds it, 棉花 reacts. "{n}" is the child's name.
+const STORY=/*STORY*/[
+  {id:"family",name:"家人",bg:"img/family.webp",
+   spots:[["car",0,46,12,40],["lamp",89,6,8,77],["dad",12,14,22,86],["cotton",35,52,19,48],["mom",55,26,22,74]],
+   intro:[["旁白","早安！這是棉花的家人。"]],
+   tasks:[["mom","旁白","{n}，媽媽在哪裡？","媽媽","早安，棉花！早安，{n}！"],
+          ["dad","旁白","爸爸在哪裡？","棉花","我愛爸爸！"],
+          ["cotton","旁白","棉花在哪裡？點點看！","棉花","我在這裡！"],
+          ["car","棉花","{n}，我們家的汽車在哪裡？","棉花","這是我們家的汽車！叭叭！今天要做什麼呢？"]]},
+  {id:"bath",name:"浴室",room:"bath",
+   intro:[["旁白","棉花起床了，要去浴室刷牙囉！"]],
+   tasks:[["toothbrush","媽媽","{n}，幫棉花找到牙刷！","棉花","刷刷刷，牙齒白白的！","wash"],
+          ["towel","棉花","毛巾在哪裡？我要擦擦臉！","棉花","擦一擦，好舒服！","happy"]]},
+  {id:"kitchen",name:"廚房",room:"kitchen",
+   intro:[["媽媽","早餐準備好了！"]],
+   tasks:[["bread","棉花","我想吃麵包！{n}，麵包在哪裡？","棉花","麵包香香的，好好吃！","eat"],
+          ["banana","媽媽","{n}，幫棉花找到香蕉！","棉花","香蕉甜甜的，好好吃！","eat"]]},
+  {id:"living",name:"客廳",room:"living",
+   intro:[["棉花","吃飽了，我們來玩玩具！"]],
+   tasks:[["ball","棉花","{n}，球在哪裡？","棉花","球滾來滾去，好好玩！","hop"],
+          ["train","棉花","我的小火車在哪裡？","棉花","小火車嘟嘟嘟！","hop"]]},
+  {id:"door",name:"出門",room:"door",
+   intro:[["媽媽","棉花，我們去公園玩吧！"]],
+   tasks:[["door","媽媽","{n}，幫棉花打開門！","棉花","出發囉！","hop"]]},
+  {id:"walk",name:"走路",walk:true,
+   intro:[["旁白","棉花和媽媽走路去公園。"]],
+   tasks:[["school","旁白","{n}，你看，學校在哪裡？","棉花","那是學校！等我長大就去上學！","happy"]]},
+  {id:"park",name:"公園",room:"park",
+   intro:[["媽媽","到公園囉！"]],
+   tasks:[["slide","棉花","我想溜滑梯！{n}，溜滑梯在哪裡？","棉花","咻！溜下來，好好玩！","hop"],
+          ["swing","媽媽","{n}，幫棉花找到盪鞦韆！","棉花","盪高高，飛起來囉！","happy"],
+          ["squirrel","棉花","樹上有誰在吃果子？","棉花","是松鼠！你好，松鼠！","happy"]]},
+  {id:"bedroom",name:"房間",room:"bedroom",
+   intro:[["旁白","天黑了，棉花和媽媽回家囉。"],["媽媽","棉花，該準備睡覺囉！"]],
+   tasks:[["pillow","媽媽","{n}，幫棉花找到枕頭！","棉花","枕頭軟軟的，好舒服！","happy"],
+          ["teddy","棉花","我要抱小熊睡覺！{n}，小熊在哪裡？","棉花","小熊，我們一起睡覺吧！","hug"],
+          ["bed","媽媽","{n}，棉花的床在哪裡？","棉花","我躺好了，晚安！","sleep"]]},
+]/*END*/;
+const STORY_END=["旁白","玩了一整天，棉花好累喔。晚安，棉花！晚安，{n}！"];
+const WALK_SPOT=["school",80,28,17,34];
+let sc=null, target=null, targetDone=null;
+const T=t=>t.split("{n}").join(N());
+const until=()=>new Promise(r=>{ const p=lastSpeech; p.then(()=>setTimeout(r,500)); });
+async function line(who,text){ say(T(text),who); await until(); }
+function storySpotSrc(s){ if(sc.walk) return thumb("walk",s); if(sc.room) return thumb(sc.room,s);
+  const k=s[0]; if(SPR[k]) return SPR[k].url; if(k==="cotton") return SPR.stand.url;
+  const [,x,y,w,h]=s, im=IMG.family, iw=im.naturalWidth, ih=im.naturalHeight, vis=iw*9/16, off=(ih-vis)/2;
+  const c=document.createElement("canvas"); c.width=w/100*iw; c.height=h/100*vis;
+  c.getContext("2d").drawImage(im,x/100*iw,off+y/100*vis,c.width,c.height,0,0,c.width,c.height); return c.toDataURL("image/jpeg",.85); }
+const roomName=n=>LANG()==="en"?(ROOM_EN[n]||n):LANG()==="cn"?toS(n):n;
+function storyChips(i){ $("path").innerHTML=STORY.map((x,j)=>`<span class="${j<i?"done":j===i?"now":"lock"}">${j>i?"🔒 ":""}${roomName(x.name)}</span>`).join(""); $("path").hidden=false; }
+function spotEl(k,x,y,w,h,parent){ const b=document.createElement("button"); b.className="spot"; b.dataset.w=k; b.setAttribute("aria-label",W[k][0]);
+  Object.assign(b.style,{left:x+"%",top:y+"%",width:w+"%",height:h+"%"}); b.onclick=()=>tapSpot([k,x,y,w,h],b); (parent||layer).appendChild(b); return b; }
+let storyRun=0;
+async function playStory(i){
+  clearStage(); mode="story"; OUTFIT="home"; sc=STORY[i]; target=null; $("homeBtn").hidden=false; storyChips(i);
+  const me=++storyRun, alive=()=>me===storyRun&&mode==="story";
+  const R=sc.room&&ROOMS.find(r=>r.id===sc.room); room=R||{id:sc.id,spots:[],chars:[]};
+  $("stage").classList.toggle("night",sc.id==="bedroom");
+  if(sc.walk){
+    $("bg").src="img/walk.webp"; $("bg").style.visibility="hidden";
+    const pano=document.createElement("div"); pano.className="pano"; pano.innerHTML=`<img src="img/walk.webp" alt="">`; layer.appendChild(pano);
+    spotEl(...WALK_SPOT,pano);
+    const m=addChar("mom","mom",34,4,44); m.onclick=()=>tapChar("mom",m);
+    const c=addChar("cotton","hop",50,4,30); c.id="cot"; c.classList.add("walkhop"); c.onclick=()=>tapChar("cotton",c);
+    await line(...sc.intro[0]); if(!alive()) return;
+    pano.style.transform=`translateX(${-(pano.offsetWidth-$("stage").offsetWidth)}px)`; await new Promise(r=>setTimeout(r,9000)); if(!alive()) return;
+    c.classList.remove("walkhop"); c.src=anyPose("stand").url;
+  } else {
+    $("bg").style.visibility=""; $("bg").src=R?R.img:sc.bg;
+    (R?roomSpots(R):sc.spots).forEach(s=>spotEl(...s));
+    if(R){ R.chars.forEach(([k,cx,bot,h])=>{ const el=addChar(k,k,cx,bot,h); el.onclick=()=>tapChar(k,el); });
+      if(R.cotton){ const [cx,bot,h,p]=R.cotton; const el=addChar("cotton",p,cx,bot,h); el.id="cot"; el.onclick=()=>tapChar("cotton",el); } }
+    for(const l of sc.intro){ await line(...l); if(!alive()) return; }
+  }
+  for(const [k,askWho,ask,doneWho,done,pose] of sc.tasks){
+    if(!alive()) return;
+    target=k; say(T(ask),askWho); storyNudge();
+    await new Promise(r=>targetDone=r); if(!alive()) return;
+    target=null; stopNudge();
+    if(sc.id==="door"&&!$("cot")){ const el=addChar("cotton","hop",61,2,38); el.id="cot"; el.onclick=()=>tapChar("cotton",el); }
+    if(pose) swapCotton([pose]); else swapCotton();
+    await line(doneWho,done);
+  }
+  if(!alive()) return;
+  if(PROG.story<=i){ PROG.story=i+1; save(); } storyChips(i+1); yay(); petals();
+  if(i===STORY.length-1){ await line(...STORY_END); if(alive()) storyFinale(); return; }
+  $("next").textContent=LANG()==="en"?`Next: ${roomName(STORY[i+1].name)} ▶`:show(`下一站：${STORY[i+1].name} ▶`); $("next").hidden=false; $("next").onclick=()=>{ ding(); playStory(i+1); };
+}
+async function storyTap(k,el,src){
+  ping(el); if(el.classList.contains("char")){ el.classList.remove("hop"); el.offsetWidth; el.classList.add("hop"); }
+  if(!target) return;
+  if(k===target){ const r=targetDone; target=null; el.classList.add("found"); yay(); showCard(k,src()); await until(); targetDone=null; r&&r(); }
+  else if(W[k]){ oops(); say(`這是${W[k][0]}喔。再找找${W[target][0]}在哪裡？`,"旁白"); storyNudge(); }
+}
+// after a while, a ring shows where the answer is
+function storyNudge(){ stopNudge(); nudgeT=setTimeout(()=>{ if(!target) return;
+  const b=layer.querySelector(`[data-w="${target}"]`); if(!b) return;
+  const r=b.getBoundingClientRect(), s=$("stage").getBoundingClientRect(), d=Math.min(170,Math.max(80,Math.min(r.width,r.height)));
+  nudgeEl=document.createElement("div"); nudgeEl.className="nudge"; Object.assign(nudgeEl.style,{width:d+"px",height:d+"px",left:(r.left-s.left+r.width/2-d/2)+"px",top:(r.top-s.top+r.height/2-d/2)+"px"});
+  layer.appendChild(nudgeEl); },9000); }
+function storyFinale(){ $("doneHero").src=(SPR.sleep||SPR.hug).url; $("doneTitle").textContent=LANG()==="en"?"Good night, Cotton!":show("晚安，棉花！");
+  $("doneSub").textContent=show(`${N()}好棒！你陪棉花過了開心的一天！`); $("done").hidden=false; }
+
+
+// ================= 魔法畫室 =================
+// Draw on white paper, or colour 棉花's world: on a scene the strokes use the "color" blend,
+// so the watercolour texture stays and only the colour changes (a pink sofa, a purple sky…).
+const PALETTE=["red","orange","peach","yellow","gold","lightgreen","green","skyblue","blue","navy","purple","pink","brown","gray","black","white"];
+const HEX={red:"#ff4d5e",orange:"#ff9f43",yellow:"#ffd43b",green:"#51cf66",blue:"#4dabf7",purple:"#9775fa",pink:"#f783ac",brown:"#a0703c",black:"#343a40",white:"#ffffff",skyblue:"#8fd3fe",lightgreen:"#b2f2bb",navy:"#1c3f94",gray:"#adb5bd",gold:"#e8b10e",peach:"#ffc9a0"};
+const SIZES=[1.2,2.6,5];
+let pen={color:"red",size:1,erase:false}, strokes=[], drawing=null;
+function showPaintPick(){ clearStage(); showHubBg();
+  $("paintList").innerHTML=[`<button data-p="paper"><span class="paperthumb"></span>${show("白紙")}</button>`,...ROOMS.map(r=>`<button data-p="${r.id}"><img src="${r.img}" alt="">${roomName(r.name)}</button>`)].join("");
+  $("paintPick").hidden=false; say(`${N()}，想畫在哪裡？`,"棉花"); }
+$("paintList").addEventListener("click",e=>{ const b=e.target.closest("[data-p]"); if(!b) return; $("paintPick").hidden=true; ding(); openPaint(b.dataset.p); });
+const LINEART={};
+function blur(src,w,h,r){ const out=new Float32Array(w*h), tmp=new Float32Array(w*h), n=2*r+1;
+  for(let y=0;y<h;y++){ let s=0; for(let x=-r;x<=r;x++) s+=src[y*w+Math.min(w-1,Math.max(0,x))];
+    for(let x=0;x<w;x++){ tmp[y*w+x]=s/n; s+=src[y*w+Math.min(w-1,x+r+1)]-src[y*w+Math.max(0,x-r)]; } }
+  for(let x=0;x<w;x++){ let s=0; for(let y=-r;y<=r;y++) s+=tmp[Math.min(h-1,Math.max(0,y))*w+x];
+    for(let y=0;y<h;y++){ out[y*w+x]=s/n; s+=tmp[Math.min(h-1,y+r+1)*w+x]-tmp[Math.max(0,y-r)*w+x]; } }
+  return out; }
+function lineArt(id){ if(LINEART[id]) return LINEART[id];
+  const im=IMG[id]; const w=1400, h=Math.round(w*im.naturalHeight/im.naturalWidth);
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d"); x.drawImage(im,0,0,w,h);
+  const d=x.getImageData(0,0,w,h), g=new Float32Array(w*h);
+  for(let i=0;i<w*h;i++) g[i]=.3*d.data[i*4]+.59*d.data[i*4+1]+.11*d.data[i*4+2];
+  const a=blur(g,w,h,1), b=blur(g,w,h,4);
+  for(let i=0;i<w*h;i++){ const v=a[i]-b[i]; const k=v<-7?Math.max(30,255+v*9):255; d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=k; d.data[i*4+3]=255; }
+  x.putImageData(d,0,0); return LINEART[id]=c.toDataURL("image/png"); }
+function openPaint(page){
+  clearStage(); mode="paint"; strokes=[]; $("homeBtn").hidden=false;
+  const R=ROOMS.find(r=>r.id===page);
+  if(R){ $("bg").src=lineArt(R.id); } else { $("bg").style.visibility="hidden"; $("stage").classList.add("paperbg"); }
+  const c=document.createElement("canvas"); c.id="pc"; c.className="paintc"+(R?" mult":""); layer.appendChild(c);
+  sizeCanvas(); bindPaint(c); drawBar(); $("paintBar").hidden=false; $("sayBox").classList.add("top");
+  say(R?"選一個顏色，幫棉花的家塗上顏色吧！":"選一個顏色，畫畫看吧！","棉花"); }
+function sizeCanvas(){ const c=$("pc"); if(!c) return; const r=$("stage").getBoundingClientRect(), d=window.devicePixelRatio||1;
+  c.width=Math.round(r.width*d); c.height=Math.round(r.height*d); redraw(); }
+function redraw(){ const c=$("pc"); if(!c) return; const x=c.getContext("2d"); x.clearRect(0,0,c.width,c.height); strokes.forEach(st=>drawStroke(x,c,st,0)); }
+function drawStroke(x,c,st,from){ x.save(); x.globalCompositeOperation=st.erase?"destination-out":"source-over";
+  x.strokeStyle=x.fillStyle=HEX[st.color]; x.lineCap=x.lineJoin="round"; x.lineWidth=SIZES[st.size]/100*c.width;
+  const P=([a,b])=>[a*c.width,b*c.height], p=st.pts;
+  if(p.length===1){ const [u,v]=P(p[0]); x.beginPath(); x.arc(u,v,x.lineWidth/2,0,7); x.fill(); }
+  else { x.beginPath(); x.moveTo(...P(p[Math.max(0,from-1)])); for(let i=Math.max(1,from);i<p.length;i++) x.lineTo(...P(p[i])); x.stroke(); }
+  x.restore(); }
+function bindPaint(c){
+  const pt=e=>{ const r=c.getBoundingClientRect(); return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]; };
+  c.addEventListener("pointerdown",e=>{ e.preventDefault(); c.setPointerCapture(e.pointerId);
+    drawing={color:pen.color,size:pen.size,erase:pen.erase,pts:[pt(e)]}; strokes.push(drawing); drawStroke(c.getContext("2d"),c,drawing,0); });
+  c.addEventListener("pointermove",e=>{ if(!drawing) return; drawing.pts.push(pt(e)); drawStroke(c.getContext("2d"),c,drawing,drawing.pts.length-1); });
+  const end=()=>{ drawing=null; }; c.addEventListener("pointerup",end); c.addEventListener("pointercancel",end); }
+function drawBar(){
+  $("paintBar").innerHTML=PALETTE.map(k=>`<button class="sw" data-c="${k}" style="background:${HEX[k]}" aria-label="${W[k][0]}" aria-pressed="${!pen.erase&&pen.color===k}"></button>`).join("")
+   +`<span class="gap"></span>`+SIZES.map((s,i)=>`<button class="tool" data-s="${i}" aria-label="筆的粗細 ${i+1}" aria-pressed="${!pen.erase&&pen.size===i}"><span class="sz" style="width:${6+i*7}px;height:${6+i*7}px"></span></button>`).join("")
+   +`<button class="tool" data-t="erase" aria-label="橡皮擦" aria-pressed="${pen.erase}">🧽</button><button class="tool" data-t="undo" aria-label="上一步">↩️</button><button class="tool" data-t="clear" aria-label="全部擦掉">🗑️</button><button class="tool done" data-t="done" aria-label="完成">⭐</button>`; }
+$("paintBar").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.c){ pen.color=b.dataset.c; pen.erase=false; const [zh,,en]=W[pen.color]; speak(LANG()==="en"?[[en,"en"],[zh,"zh"]]:[[zh,"zh"],[en,"en"]],"旁白");
+    $("line").textContent=LANG()==="en"?`${en}  ${W[pen.color][6]} ${W[pen.color][4]}`:LANG()==="cn"?`${W[pen.color][6]}  ${en}`:`${zh}  ${en}`; }
+  else if(b.dataset.s){ pen.size=+b.dataset.s; pen.erase=false; ding(); }
+  else if(b.dataset.t==="erase"){ pen.erase=!pen.erase; ding(); }
+  else if(b.dataset.t==="undo"){ strokes.pop(); redraw(); ding(); }
+  else if(b.dataset.t==="clear"){ strokes=[]; redraw(); oops(); }
+  else if(b.dataset.t==="done"){ yay(); petals(); swapCotton(); say("哇！這是你創造的彩色世界，好特別呀！","棉花"); }
+  drawBar(); });
+
+// gentle nudge toward something not yet tapped (for little ones who wait)
+let nudgeT=null, nudgeEl=null;
+function stopNudge(){ clearTimeout(nudgeT); nudgeEl&&nudgeEl.remove(); nudgeEl=null; }
+function idle(){ stopNudge(); if(mode==="hub") return; nudgeT=setTimeout(()=>{
+  const left=[...layer.querySelectorAll(".spot:not(.found)")]; if(!left.length||quiz) return;
+  const b=left[Math.floor(Math.random()*left.length)], r=b.getBoundingClientRect(), s=$("stage").getBoundingClientRect(), d=Math.min(160,Math.max(70,Math.min(r.width,r.height)));
+  nudgeEl=document.createElement("div"); nudgeEl.className="nudge"; Object.assign(nudgeEl.style,{width:d+"px",height:d+"px",left:(r.left-s.left+r.width/2-d/2)+"px",top:(r.top-s.top+r.height/2-d/2)+"px"});
+  layer.appendChild(nudgeEl); say(`${N()}，點點看這裡！`,"棉花"); },9000); }
+
+// ---------- hub menu ----------
+function showFree(){ clearStage(); showHubBg(); $("roomList").innerHTML=ROOMS.map((r,i)=>`<button data-i="${i}"><img src="${r.img}" alt="">${roomName(r.name)}<small class="lv">${stars(r)}</small></button>`).join(""); $("free").hidden=false; say(`${N()}，想去哪個房間玩？`); }
+function showHubBg(){ $("bg").src="img/hub.webp"; $("homeBtn").hidden=true; }
+$("roomList").addEventListener("click",e=>{ const b=e.target.closest("[data-i]"); if(!b) return; $("free").hidden=true; ding(); openRoom(+b.dataset.i,"free"); });
+$("mPaint").onclick=()=>{ ding(); showPaintPick(); };
+$("mFree").onclick=()=>{ ding(); showFree(); };
+$("mStory").onclick=()=>{ ding(); playStory(PROG.story>=STORY.length?0:PROG.story); };
+$("mBook").onclick=()=>{ ding(); const ks=PROG.words.filter(k=>W[k]);
+  $("bookTitle").textContent=`${N()}的成長紀錄`; $("bookSub").textContent=ks.length?`已經學會 ${ks.length} 個字，故事冒險走到第 ${Math.min(PROG.story+1,ROOMS.length)} 站`:"還沒有學會的字，快去探險吧！";
+  $("bookList").innerHTML=ks.map(k=>{ let src=""; for(const r of ROOMS){ const s=r.spots.find(s=>s[0]===k); if(s){src=thumb(r.id,s);break;} } if(!src&&SPR[k]) src=SPR[k].url; if(!src&&k==="cotton") src=SPR.stand.url;
+    return `<span><img src="${src}" alt="">${W[k][0]}<b>${W[k][2]}</b></span>`; }).join("");
+  $("bookPanel").hidden=false; };
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{ b.closest(".overlay").hidden=true; showHub(); });
+$("homeBtn").onclick=()=>{ ding(); try{speechSynthesis.cancel();}catch(e){} showHub(); };
+
+// ---------- setup: name, age, boy/girl ----------
+try{ pick(); speechSynthesis.onvoiceschanged=pick; }catch(e){}
+if(ME.age>5) ME.age=5; if(ME.age<1) ME.age=1;
+$("ages").innerHTML=[1,2,3,4,5].map(a=>`<button class="pick" data-a="${a}" aria-pressed="${ME.age===a}">${a} 歲</button>`).join("");
+$("nm").value=ME.name;
+function applyKid(){ document.documentElement.dataset.kid=ME.g||"girl"; document.querySelectorAll("[data-g]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.g===ME.g)); }
+applyKid();
+$("ages").addEventListener("click",e=>{ const b=e.target.closest("[data-a]"); if(!b) return; ME.age=+b.dataset.a; ding(); $("ages").querySelectorAll("[data-a]").forEach(x=>x.setAttribute("aria-pressed",x===b)); });
+document.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{ ME.g=b.dataset.g; applyKid(); ding(); });
+$("setBtn").onclick=()=>{ $("setup").hidden=false; $("play").textContent="好了 ▶"; };
+$("langs").addEventListener("click",e=>{ const b=e.target.closest("[data-lang]"); if(!b) return; ME.lang=b.dataset.lang; save(); applyLangUI(); ding(); });
+applyLangUI();
+$("play").onclick=()=>{ if($("play").disabled) return; unlockAudio(); muted=false; $("sndBtn").textContent="🔊"; ME.name=$("nm").value.trim().slice(0,12); save();
+  if(ME.g&&SPR[ME.g]) $("meAv").innerHTML=`<img src="${SPR[ME.g].url}" alt="">`; else $("meAv").textContent=[...N()][0].toUpperCase(); $("meName").textContent=N(); $("meAge").textContent=`${ME.age} 歲`; $("me").hidden=false;
+  $("setup").hidden=true; $("replay").hidden=false; yay(); showHub(); };
+
+function petals(){ const cs=["#f4b6c4","#f7d2dc","#fbe0a6","#cfe2c2"]; for(let i=0;i<26;i++){ const p=document.createElement("div"); p.className="petal";
+  p.style.background=cs[i%4]; p.style.left=Math.random()*100+"%"; p.style.animationDuration=(2+Math.random()*1.8)+"s"; p.style.animationDelay=Math.random()*.6+"s";
+  $("app").appendChild(p); setTimeout(()=>p.remove(),4500); } }
+
+$("bg").src="img/hub.webp";
+loadAllVoices();
+loadAll().then(()=>{ $("setupHero").src=SPR.happy.url; $("pkBoy").src=SPR.boy.url; $("pkGirl").src=SPR.girl.url; $("play").disabled=false; $("play").textContent="開始 ▶"; })
+  .catch(()=>{ $("play").disabled=false; $("play").textContent="開始 ▶"; });
+</script>
+<script>if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>

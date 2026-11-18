@@ -623,8 +623,8 @@ function browserSay(t,l,rate=.72){ return new Promise(res=>{ const S=window.spee
 // next steps wait for the current sentence to finish instead of a fixed timer
 let lastSpeech=Promise.resolve();
 const afterSpeech=(fn,ms=600,always=false)=>{ const p=lastSpeech; p.then(()=>{ if(always||p===lastSpeech) setTimeout(fn,ms); }); };
-let talking=0;   // how many lines are still being spoken (the tap-here hint waits for 0)
-function speak(parts,who){ talking++; lastSpeech=speakNow(parts,who); lastSpeech.finally(()=>talking--); return lastSpeech; }
+let talking=0, quietSince=0;   // lines still being spoken, and when the last one ended (the tap-here hint waits for a quiet moment)
+function speak(parts,who){ talking++; lastSpeech=speakNow(parts,who); lastSpeech.finally(()=>{ if(--talking===0) quietSince=Date.now(); }); return lastSpeech; }
 async function speakNow(parts,who="旁白"){ if(muted) return; const id=++speakId;
   try{ curSrc&&curSrc.stop(); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){}
   const c=cast(who), packs=l=>(l==="en"?["","-x","-y","-z","-n"]:["","-x","-y","-z","-n","-s"]).map(x=>(l==="en"?c.en:c.zh)+x);
@@ -687,7 +687,7 @@ function showCard(k,src,who="旁白"){
   spoken=spoken||Promise.resolve(); lastSay=fact; pair={zh:fact,en:factEn}; xlShow();
   if(k!=="me"&&!PROG.words.includes(k)){ PROG.words.push(k); save(); }
   clearTimeout(cardT); const me=++cardId;
-  spoken.then(()=>{ if(me===cardId) cardT=setTimeout(()=>$("card").hidden=true,4000); }); }
+  spoken.then(()=>{ if(me===cardId) cardT=setTimeout(()=>$("card").hidden=true,6000); }); }
 $("card").onclick=()=>{ $("card").hidden=true; clearTimeout(cardT); };
 
 // ---------- screens ----------
@@ -968,7 +968,7 @@ let nudgeT=null, nudgeEl=null;
 function stopNudge(){ clearTimeout(nudgeT); nudgeEl&&nudgeEl.remove(); nudgeEl=null; }
 function idle(){ stopNudge(); if(mode==="hub") return; const fire=()=>{
   // never cut Cotton off: wait until nothing is being said and the picture card is closed
-  if(talking>0||!$("card").hidden){ nudgeT=setTimeout(fire,3000); return; }
+  if(talking>0||!$("card").hidden||Date.now()-quietSince<8000){ nudgeT=setTimeout(fire,2000); return; }
   // only point at things a finger can actually reach (not hidden under the top bar)
   const left=[...layer.querySelectorAll(".spot:not(.found)")].filter(b=>{ const r=b.getBoundingClientRect(), el=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2); return el&&(el===b||b.contains(el)); });
   if(!left.length||quiz) return;

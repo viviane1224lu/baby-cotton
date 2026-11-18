@@ -446,7 +446,7 @@ let hubT=null;
 function cheer(){ const p=$("pl"); if(p){ p.classList.remove("hop"); p.offsetWidth; p.classList.add("hop"); } }
 function swapCotton(names){ names=names||(OUTFIT==="home"?HOME_MOODS:MOODS); cheer(); const el=$("cot"); if(!el) return; let s, tries=0;
   do{ s=anyPose(...names); }while(s&&s.url===el.src&&++tries<6);
-  if(s) el.src=s.url; el.classList.remove("hop"); el.offsetWidth; el.classList.add("hop"); }
+  if(s){ el.src=s.url; fitCot(el,s); } el.classList.remove("hop"); el.offsetWidth; el.classList.add("hop"); }
 
 // ---------- saved state (this device only) ----------
 const ME={name:"",age:2,g:""}, PROG={story:0,words:[],lv:{}};
@@ -462,9 +462,16 @@ function cutout(img,rect){
   const [sx,sy,sw,sh]=rect||[0,0,img.naturalWidth,img.naturalHeight];
   const c=document.createElement("canvas"); c.width=sw; c.height=sh; const x=c.getContext("2d");
   x.drawImage(img,sx,sy,sw,sh,0,0,sw,sh); const im=x.getImageData(0,0,sw,sh), d=im.data, NN=sw*sh;
-  const bg=new Uint8Array(NN), isW=i=>{const r=d[i*4],g=d[i*4+1],b=d[i*4+2]; return r>=247&&g>=245&&b>=241&&Math.max(r,g,b)-Math.min(r,g,b)<=9;};
+  const bg=new Uint8Array(NN), isW=i=>{const r=d[i*4],g=d[i*4+1],b=d[i*4+2]; return r>=252&&g>=251&&b>=249&&Math.max(r,g,b)-Math.min(r,g,b)<=5;};
   const st=[]; for(let i=0;i<sw;i++) st.push(i,(sh-1)*sw+i); for(let j=0;j<sh;j++) st.push(j*sw,j*sw+sw-1);
   while(st.length){const p=st.pop(); if(bg[p]||!isW(p)) continue; bg[p]=1; const px=p%sw,py=(p-px)/sw;
+    if(px>0)st.push(p-1); if(px<sw-1)st.push(p+1); if(py>0)st.push(p-sw); if(py<sh-1)st.push(p+sw);}
+  // close small gaps in the bunny's outline, then fill holes, so white fur never turns see-through
+  const grow=(m,v)=>{ const o=m.slice(); for(let p=0;p<NN;p++){ if(m[p]!==v) continue; const px=p%sw;
+      if(px>0)o[p-1]=v; if(px<sw-1)o[p+1]=v; if(p>=sw)o[p-sw]=v; if(p+sw<NN)o[p+sw]=v; } return o; };
+  let fg=bg.map(v=>v?0:1); for(let i=0;i<3;i++) fg=grow(fg,1); for(let i=0;i<3;i++) fg=grow(fg,0);
+  bg.fill(0); for(let i=0;i<sw;i++) st.push(i,(sh-1)*sw+i); for(let j=0;j<sh;j++) st.push(j*sw,j*sw+sw-1);
+  while(st.length){const p=st.pop(); if(bg[p]||fg[p]) continue; bg[p]=1; const px=p%sw,py=(p-px)/sw;
     if(px>0)st.push(p-1); if(px<sw-1)st.push(p+1); if(py>0)st.push(p-sw); if(py<sh-1)st.push(p+sw);}
   const lab=new Int32Array(NN); let best=0,bestN=0,cur=0;
   for(let p=0;p<NN;p++){ if(bg[p]||lab[p]) continue; cur++; let n=0; const q=[p]; lab[p]=cur;
@@ -593,9 +600,9 @@ function zhChunks(t){ const nm=N(), out=[];
 function playClip(buf,[off,dur],rate){ return new Promise(res=>{ try{ if(ac.state!=="running") ac.resume();
   const s=ac.createBufferSource(); s.buffer=buf; s.playbackRate.value=rate; s.connect(ac.destination); s.onended=()=>res(); curSrc=s; s.start(0,off,dur);
   setTimeout(res,(dur/rate+.6)*1000); }catch(e){ res(); } }); }
-function browserSay(t,l){ return new Promise(res=>{ const S=window.speechSynthesis; if(!S) return res();
+function browserSay(t,l,rate=.72){ return new Promise(res=>{ const S=window.speechSynthesis; if(!S) return res();
   try{ const u=new SpeechSynthesisUtterance(t); u.lang=l==="en"?"en-US":"zh-TW"; const v=l==="en"?enV:zhV; if(v){u.voice=v;u.lang=v.lang;}
-    u.rate=.72; u.onend=u.onerror=()=>res(); S.speak(u); setTimeout(res,900+t.length*420); }catch(e){ res(); } }); }
+    u.rate=rate; u.onend=u.onerror=()=>res(); S.speak(u); setTimeout(res,900+t.length*420); }catch(e){ res(); } }); }
 // next steps wait for the current sentence to finish instead of a fixed timer
 let lastSpeech=Promise.resolve();
 const afterSpeech=(fn,ms=600,always=false)=>{ const p=lastSpeech; p.then(()=>{ if(always||p===lastSpeech) setTimeout(fn,ms); }); };
@@ -612,7 +619,7 @@ async function speakNow(parts,who="旁白"){ if(muted) return; const id=++speakI
     if(prev!==null) await rest(pi!==prev?900:350); prev=pi; if(id!==speakId||muted) return;
     const C=clips[i]&&await clips[i]; if(id!==speakId||muted) return;
     if(C) await playClip(C.b,[C.off,C.dur],1);
-    else if(t===N()) continue;   // a name with no recording is shown, not spoken, so the voice never switches mid-sentence
+    else if(t===N()) await browserSay(t,l,1);   // a name with no recording: the phone's own voice says it
     else await browserSay(t,l); } }
 // iPhone/iPad only allow speech after a tap: say something tiny inside the first tap
 function unlockAudio(){ try{ const u=new SpeechSynthesisUtterance(" "); u.volume=0; speechSynthesis.speak(u); }catch(e){}
@@ -655,12 +662,13 @@ function addPlayer(cx,bottom,h){ if(!ME.g||!SPR[ME.g]) return; const el=addChar(
   el.onclick=()=>{ cheer(); if(quiz) return; showCard("me",el.src); }; }
 function addChar(key,sprite,cx,bottom,h){ const s=key==="cotton"?(anyPose(sprite)||SPR[sprite]):SPR[sprite]; const el=document.createElement("img");
   el.className="char"; el.src=s.url; el.alt=key==="me"?N():W[key][0]; el.dataset.w=key;
-  Object.assign(el.style,{left:cx+"%",bottom:bottom+"%",height:h+"%"}); layer.appendChild(el); return el; }
+  Object.assign(el.style,{left:cx+"%",bottom:bottom+"%",height:h+"%"}); el.dataset.h=h; if(key==="cotton") fitCot(el,s); layer.appendChild(el); return el; }
+function fitCot(el,s){ const asp=s.w/s.h; el.style.height=(+el.dataset.h*Math.min(1,.95/asp))+"%"; }
 
 function showHub(){
   clearStage(); mode="hub"; OUTFIT="home"; $("bg").src="img/hub.webp"; $("hubUI").hidden=false; $("homeBtn").hidden=true;
   applyLangUI(); $("sayBox").classList.add("hub");
-  const c=addChar("cotton","stand",52,22,50); c.id="cot"; c.classList.add("hop");
+  const c=addChar("cotton","stand",54,22,40); c.id="cot"; c.classList.add("hop");
   c.onclick=()=>{ swapCotton(); say(`嗨，${N()}！我是棉花，歡迎來我家玩！`); };
   hubT=setInterval(()=>swapCotton(Math.random()<.2?["sleep"]:null),6000);
   say(`嗨，${N()}！我是棉花！來看看我的家，認識好多好多東西吧！`);

@@ -204,15 +204,15 @@ button:focus-visible{outline:4px solid var(--accent);outline-offset:3px}
       <img class="hero" id="setupHero" alt="棉花">
       <h2>Baby Cotton 小棉花的冒險日記</h2>
       <div class="form">
-        <label for="nm">你叫什麼名字？</label>
+        <div class="q">🌐 Language · 語言</div>
+        <div class="row" id="langs"><button class="pick" data-lang="en" aria-pressed="false">English</button><button class="pick" data-lang="tw" aria-pressed="false">繁體＋注音</button><button class="pick" data-lang="cn" aria-pressed="false">简体＋拼音</button></div>
+        <label for="nm" id="qName">你叫什麼名字？</label>
         <input id="nm" maxlength="12" placeholder="例如：Vivian" autocomplete="off">
-        <div class="q">你幾歲？</div>
+        <div class="q" id="qAge">你幾歲？</div>
         <div class="row" id="ages"></div>
-        <div class="q">你是男生還是女生？</div>
-        <div class="row"><button class="pick boy" data-g="boy" aria-pressed="false"><img id="pkBoy" alt="">男生</button><button class="pick girl" data-g="girl" aria-pressed="false"><img id="pkGirl" alt="">女生</button></div>
-        <div class="q">語言 Language</div>
-        <div class="row" id="langs"><button class="pick" data-lang="tw" aria-pressed="false">繁體＋注音</button><button class="pick" data-lang="cn" aria-pressed="false">简体＋拼音</button><button class="pick" data-lang="en" aria-pressed="false">English → 中文</button></div>
-        <div class="q">聲音（爸爸媽媽可以幫忙選）</div>
+        <div class="q" id="qG">你是男生還是女生？</div>
+        <div class="row"><button class="pick boy" data-g="boy" aria-pressed="false"><img id="pkBoy" alt=""><span id="tBoy">男生</span></button><button class="pick girl" data-g="girl" aria-pressed="false"><img id="pkGirl" alt=""><span id="tGirl">女生</span></button></div>
+        <div class="q" id="qVoice">聲音（爸爸媽媽可以幫忙選）</div>
         <div class="row" id="packs"></div>
       </div>
       <button class="go" id="play" disabled>準備中…</button>
@@ -343,7 +343,18 @@ function applyLangUI(){ const L=LANG();
   document.querySelector(".title .zh").textContent=T3("小棉花的冒險日記","Cotton's Adventure Diary");
   $("ribName").parentNode.innerHTML=L==="en"?`<b id="ribName"></b>, come play at Cotton's house!`:`<b id="ribName"></b>${T3("，一起來棉花家玩！","")}`;
   $("ribName").textContent=N();
+  $("qName").textContent=T3("你叫什麼名字？","What's your name?"); $("nm").placeholder=T3("例如：Vivian","e.g. Vivian");
+  $("qAge").textContent=T3("你幾歲？","How old are you?"); $("qG").textContent=T3("你是男生還是女生？","Are you a boy or a girl?");
+  $("tBoy").textContent=T3("男生","Boy"); $("tGirl").textContent=T3("女生","Girl");
+  $("qVoice").textContent=T3("聲音（爸爸媽媽可以幫忙選）","Voices (parents can help choose)");
+  $("ages").querySelectorAll("[data-a]").forEach(b=>b.textContent=ageTxt(+b.dataset.a));
+  if(!$("me").hidden) $("meAge").textContent=ageTxt(ME.age);
+  playTxt(); if(typeof drawVoices==="function"&&$("packs").children.length) drawVoices();
   document.querySelectorAll("[data-lang]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.lang===L)); }
+const ageTxt=a=>LANG()==="en"?`${a} yr${a>1?"s":""}`:LANG()==="cn"?`${a} 岁`:`${a} 歲`;
+let playState="wait";   // wait | start | done
+function playTxt(){ const L=LANG(), t={wait:["準備中…","Loading…"],start:["開始 ▶","Start ▶"],done:["好了 ▶","Done ▶"]}[playState];
+  $("play").textContent=L==="en"?t[1]:L==="cn"?toS(t[0]):t[0]; }
 
 // ---------- rooms: tap spots are % boxes over the painted objects [key,x,y,w,h] ----------
 // 四個關卡（每個房間各自過關）：第 1 關 12 樣 → 第 2 關 20 樣 → 第 3 關全部，用另一種語言考 → 第 4 關聽提示找東西
@@ -439,7 +450,8 @@ function swapCotton(names){ names=names||(OUTFIT==="home"?HOME_MOODS:MOODS); che
 
 // ---------- saved state (this device only) ----------
 const ME={name:"",age:2,g:""}, PROG={story:0,words:[],lv:{}};
-try{ Object.assign(ME,JSON.parse(localStorage.getItem("bc-me")||"{}")); Object.assign(PROG,JSON.parse(localStorage.getItem("bc-prog")||"{}")); }catch(e){}
+try{ const nav=(navigator.language||"").toLowerCase(); ME.lang=/^zh-(cn|sg|hans)/.test(nav)?"cn":/^zh/.test(nav)?"tw":"en"; }catch(e){}   // first visit follows the phone's language
+try{ const saved=JSON.parse(localStorage.getItem("bc-me")||"null"); if(saved&&!saved.lang) saved.lang="tw"; Object.assign(ME,saved||{}); Object.assign(PROG,JSON.parse(localStorage.getItem("bc-prog")||"{}")); }catch(e){}
 function save(){ try{ localStorage.setItem("bc-me",JSON.stringify(ME)); localStorage.setItem("bc-prog",JSON.stringify(PROG)); }catch(e){} }
 const N=()=>ME.name||"小朋友";
 
@@ -561,11 +573,13 @@ async function getClip(pack,[off,dur]){ const k=pack+"@"+off; if(CLIP_CACHE.has(
   return c; }
 function loadAllVoices(){ ROLES.forEach(([who])=>{ const c=cast(who); ["","-x","-y","-z"].forEach(x=>{ loadIdx(c.zh+x); loadIdx(c.en+x); }); }); }
 // Settings: each character picks a Chinese and an English voice; 試聽 plays a sample
-function drawVoices(){ const opt=(lang,cur)=>VOICES[lang].map(([id,n])=>`<option value="${id}" ${id===cur?"selected":""}>${n}</option>`).join("");
-  $("packs").innerHTML=ROLES.map(([who])=>{ const c=cast(who); return `<div class="vrow"><b>${who}</b>
+const VNAME_EN={"曉雨":"Xiaoyu","曉臻":"Xiaozhen","雲哲":"Yunzhe","（小朋友）":" (child)","（男生）":" (boy)","（小女孩）":" (little girl)"};
+const vName=n=>LANG()==="en"?n.replace(/曉雨|曉臻|雲哲|（[^）]+）/g,m=>VNAME_EN[m]??m):LANG()==="cn"?toS(n):n;
+function drawVoices(){ const opt=(lang,cur)=>VOICES[lang].map(([id,n])=>`<option value="${id}" ${id===cur?"selected":""}>${vName(n)}</option>`).join("");
+  $("packs").innerHTML=ROLES.map(([who])=>{ const c=cast(who); return `<div class="vrow"><b>${showWho(who)}</b>
     <select data-who="${who}" data-lang="zh" aria-label="${who}的中文聲音">${opt("zh",c.zh)}</select>
     <select data-who="${who}" data-lang="en" aria-label="${who}的英文聲音">${opt("en",c.en)}</select>
-    <button class="pick" type="button" data-try="${who}">試聽</button></div>`; }).join(""); }
+    <button class="pick" type="button" data-try="${who}">${LANG()==="en"?"Listen":show("試聽")}</button></div>`; }).join(""); }
 drawVoices();
 $("packs").addEventListener("change",e=>{ const sel=e.target.closest("select"); if(!sel) return;
   ME.voices=ME.voices||{}; const w=sel.dataset.who; ME.voices[w]=Object.assign(cast(w),ME.voices[w]||{},{[sel.dataset.lang]:sel.value}); save();
@@ -932,17 +946,17 @@ $("homeBtn").onclick=()=>{ ding(); try{speechSynthesis.cancel();}catch(e){} show
 // ---------- setup: name, age, boy/girl ----------
 try{ pick(); speechSynthesis.onvoiceschanged=pick; }catch(e){}
 if(ME.age>5) ME.age=5; if(ME.age<1) ME.age=1;
-$("ages").innerHTML=[1,2,3,4,5].map(a=>`<button class="pick" data-a="${a}" aria-pressed="${ME.age===a}">${a} 歲</button>`).join("");
+$("ages").innerHTML=[1,2,3,4,5].map(a=>`<button class="pick" data-a="${a}" aria-pressed="${ME.age===a}">${ageTxt(a)}</button>`).join("");
 $("nm").value=ME.name;
 function applyKid(){ document.documentElement.dataset.kid=ME.g||"girl"; document.querySelectorAll("[data-g]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.g===ME.g)); }
 applyKid();
 $("ages").addEventListener("click",e=>{ const b=e.target.closest("[data-a]"); if(!b) return; ME.age=+b.dataset.a; ding(); $("ages").querySelectorAll("[data-a]").forEach(x=>x.setAttribute("aria-pressed",x===b)); });
 document.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{ ME.g=b.dataset.g; applyKid(); ding(); });
-$("setBtn").onclick=()=>{ $("setup").hidden=false; $("play").textContent="好了 ▶"; };
+$("setBtn").onclick=()=>{ $("setup").hidden=false; playState="done"; playTxt(); };
 $("langs").addEventListener("click",e=>{ const b=e.target.closest("[data-lang]"); if(!b) return; ME.lang=b.dataset.lang; save(); applyLangUI(); ding(); });
 applyLangUI();
 $("play").onclick=()=>{ if($("play").disabled) return; unlockAudio(); muted=false; $("sndBtn").textContent="🔊"; ME.name=$("nm").value.trim().slice(0,12); save();
-  if(ME.g&&SPR[ME.g]) $("meAv").innerHTML=`<img src="${SPR[ME.g].url}" alt="">`; else $("meAv").textContent=[...N()][0].toUpperCase(); $("meName").textContent=N(); $("meAge").textContent=`${ME.age} 歲`; $("me").hidden=false;
+  if(ME.g&&SPR[ME.g]) $("meAv").innerHTML=`<img src="${SPR[ME.g].url}" alt="">`; else $("meAv").textContent=[...N()][0].toUpperCase(); $("meName").textContent=N(); $("meAge").textContent=ageTxt(ME.age); $("me").hidden=false;
   $("setup").hidden=true; $("replay").hidden=false; yay(); showHub(); };
 
 function petals(){ const cs=["#f4b6c4","#f7d2dc","#fbe0a6","#cfe2c2"]; for(let i=0;i<26;i++){ const p=document.createElement("div"); p.className="petal";
@@ -951,7 +965,7 @@ function petals(){ const cs=["#f4b6c4","#f7d2dc","#fbe0a6","#cfe2c2"]; for(let i
 
 $("bg").src="img/hub.webp";
 loadAllVoices();
-loadAll().then(()=>{ $("setupHero").src=SPR.happy.url; $("pkBoy").src=SPR.boy.url; $("pkGirl").src=SPR.girl.url; $("play").disabled=false; $("play").textContent="開始 ▶"; })
-  .catch(()=>{ $("play").disabled=false; $("play").textContent="開始 ▶"; });
+loadAll().then(()=>{ $("setupHero").src=SPR.happy.url; $("pkBoy").src=SPR.boy.url; $("pkGirl").src=SPR.girl.url; $("play").disabled=false; playState="start"; playTxt(); })
+  .catch(()=>{ $("play").disabled=false; playState="start"; playTxt(); });
 </script>
 <script>if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>

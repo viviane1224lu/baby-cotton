@@ -43,7 +43,8 @@ button:focus-visible{outline:4px solid var(--accent);outline-offset:3px}
 .spot.found::after{content:"✿";position:absolute;right:-6px;top:-10px;color:#fff;font-size:22px;text-shadow:0 0 6px var(--accent),0 0 2px var(--accent)}
 .ping{position:absolute;z-index:4;border-radius:50%;pointer-events:none;border:4px solid #fff;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 45%,transparent),0 0 30px #fff;animation:ping .9s ease-out forwards}
 @keyframes ping{from{transform:scale(.5);opacity:1}to{transform:scale(1.25);opacity:0}}
-.nudge{position:absolute;left:50%;top:50%;z-index:4;border-radius:50%;pointer-events:none;border:5px solid #f97316;box-shadow:0 0 0 5px rgba(255,255,255,.9),0 0 30px 6px rgba(249,115,22,.65);animation:nudge 1s ease-in-out infinite}
+.spot:has(.nudge){z-index:6}
+.nudge{position:absolute;left:50%;top:50%;z-index:4;border-radius:50%;pointer-events:auto;cursor:pointer;border:5px solid #f97316;box-shadow:0 0 0 5px rgba(255,255,255,.9),0 0 30px 6px rgba(249,115,22,.65);animation:nudge 1s ease-in-out infinite}
 .nudge::after{content:"👆";position:absolute;left:58%;top:62%;font-size:46px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));animation:poke .8s ease-in-out infinite}
 @keyframes poke{50%{transform:translate(-6px,-12px)}}
 @keyframes nudge{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.15)}}
@@ -58,6 +59,7 @@ button:focus-visible{outline:4px solid var(--accent);outline-offset:3px}
 .top{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:flex-start;gap:10px;pointer-events:none;
   padding-top:10px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
 .top>*{pointer-events:auto}
+.top>#path,.top>#lvBadge{pointer-events:none}   /* labels only: taps go through to the picture under them */
 .chip{background:rgba(255,252,246,.94);border:2px dashed #dcc3b0;border-radius:999px;box-shadow:0 6px 16px rgba(94,74,62,.14)}
 #me{display:flex;align-items:center;gap:8px;padding:4px 16px 4px 4px}
 #me .av{width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:22px}
@@ -380,14 +382,15 @@ const STAGE_KEYS={
 const LEVEL_NAME=["","小小探索家","好奇發現家","棉花冒險家","聲音小偵探"], MAXLV=4;
 const LV=r=>Math.min(MAXLV,Math.max(1,(PROG.lv&&PROG.lv[r.id])||1));
 const stars=r=>"⭐".repeat(LV(r))+"☆".repeat(MAXLV-LV(r));
-function roomSpots(r){ const st=LV(r), keys=STAGE_KEYS[r.id]&&STAGE_KEYS[r.id][st]; return keys?r.spots.filter(s=>keys.includes(s[0])):r.spots; }
+// older kids find more: age 1–3 starts with 12 things, age 4 with 20, age 5 with everything in the room (about 30)
+function roomSpots(r){ const st=LV(r)+(ME.age>=5?2:ME.age>=4?1:0), keys=STAGE_KEYS[r.id]&&STAGE_KEYS[r.id][st]; return keys?r.spots.filter(s=>keys.includes(s[0])):r.spots; }
 const ROOMS=[
   {id:"door",name:"門口",who:"旁白",img:"img/room-door3.webp",
    intro:n=>`${n}，這裡是棉花的家！點一下門，看看誰在家？`,
-   spots:[["tree",0,0,26,48],["sakura",80,0,20,38],["roof",24,4,30,24],["chimney",61,0,8,19],["bird",36,1,6,8],["squirrel",13,10,6,8],["birdhouse",7,29,7,15],
+   spots:[["tree",0,0,12,66],["sakura",80,0,20,38],["roof",24,4,30,24],["chimney",61,0,8,19],["bird",8,25,6,8],["squirrel",13,8,6,10],["birdhouse",7,34,7,11],
           ["butterfly",20,41,5,7],["dragonfly",73,8,6,7],["window",38,41,15,17],["door",60,38,7,26],["lamp",90,11,8,74],["car",1,62,29,32],["bike",30,69,13,18],
           ["dog",40,80,8,8],["mailbox",48,62,6,27],["bunnydoll",56,70,6,18],["stairs",61,65,11,13],["bench",77,57,13,17],["teddy",81,55,6,10],
-          ["ball",70,77,7,10],["pinwheel",79,72,6,11],["wateringcan",84,76,7,11],["sidewalk",30,90,55,9]],
+          ["ball",70,77,7,10],["pinwheel",79,72,6,11],["wateringcan",84,76,7,11],["sidewalk",30,90,55,9],["lantern",56,39,4,9],["flower",90,39,8,10],["pot",54,64,6,8]],
    chars:[], cotton:null},
   {id:"living",name:"客廳",img:"img/room-living3.webp",
    intro:n=>`${n}，快進來客廳！我們來玩玩具！`,
@@ -620,7 +623,8 @@ function browserSay(t,l,rate=.72){ return new Promise(res=>{ const S=window.spee
 // next steps wait for the current sentence to finish instead of a fixed timer
 let lastSpeech=Promise.resolve();
 const afterSpeech=(fn,ms=600,always=false)=>{ const p=lastSpeech; p.then(()=>{ if(always||p===lastSpeech) setTimeout(fn,ms); }); };
-function speak(parts,who){ lastSpeech=speakNow(parts,who); return lastSpeech; }
+let talking=0;   // how many lines are still being spoken (the tap-here hint waits for 0)
+function speak(parts,who){ talking++; lastSpeech=speakNow(parts,who); lastSpeech.finally(()=>talking--); return lastSpeech; }
 async function speakNow(parts,who="旁白"){ if(muted) return; const id=++speakId;
   try{ curSrc&&curSrc.stop(); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){}
   const c=cast(who), packs=l=>(l==="en"?["","-x","-y","-z","-n"]:["","-x","-y","-z","-n","-s"]).map(x=>(l==="en"?c.en:c.zh)+x);
@@ -663,7 +667,7 @@ let lastParts=null;
 let pair=null;
 function xlShow(){ const b=$("xlBtn"), E=LANG()==="en"; $("xlTxt").hidden=true;
   if(!pair||!(E?pair.zh:pair.en)){ b.hidden=true; return; } b.textContent=E?"🔊 中文":"🔊 English"; b.hidden=false; }
-$("xlBtn").addEventListener("click",e=>{ e.stopPropagation(); if(!pair) return; const E=LANG()==="en";
+$("xlBtn").addEventListener("click",e=>{ e.stopPropagation(); if(!pair) return; if(mode!=="hub"&&!quiz) idle(); const E=LANG()==="en";
   $("xlTxt").textContent=E?(ME.lang==="cn"?toS(pair.zh):pair.zh):pair.en; $("xlTxt").hidden=false;
   clearTimeout(cardT); const me=++cardId;   // keep the picture card open while the other language plays
   speak(E?[[pair.zh,"zh"]]:[[pair.en,"en"]],lastWho).then(()=>{ if(me===cardId&&!$("card").hidden) cardT=setTimeout(()=>$("card").hidden=true,2500); }); });
@@ -962,12 +966,16 @@ $("paintBar").addEventListener("click",e=>{ const b=e.target.closest("button"); 
 // gentle nudge toward something not yet tapped (for little ones who wait)
 let nudgeT=null, nudgeEl=null;
 function stopNudge(){ clearTimeout(nudgeT); nudgeEl&&nudgeEl.remove(); nudgeEl=null; }
-function idle(){ stopNudge(); if(mode==="hub") return; nudgeT=setTimeout(()=>{
-  const left=[...layer.querySelectorAll(".spot:not(.found)")]; if(!left.length||quiz) return;
+function idle(){ stopNudge(); if(mode==="hub") return; const fire=()=>{
+  // never cut Cotton off: wait until nothing is being said and the picture card is closed
+  if(talking>0||!$("card").hidden){ nudgeT=setTimeout(fire,3000); return; }
+  // only point at things a finger can actually reach (not hidden under the top bar)
+  const left=[...layer.querySelectorAll(".spot:not(.found)")].filter(b=>{ const r=b.getBoundingClientRect(), el=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2); return el&&(el===b||b.contains(el)); });
+  if(!left.length||quiz) return;
   const b=left[Math.floor(Math.random()*left.length)], r=b.getBoundingClientRect(), d=Math.min(150,Math.max(80,Math.min(r.width,r.height)));
   // the ring lives inside the object, so it stays on it even if the screen turns or resizes
   nudgeEl=document.createElement("div"); nudgeEl.className="nudge"; Object.assign(nudgeEl.style,{width:d+"px",height:d+"px"});
-  b.appendChild(nudgeEl); say(`${N()}，點點看這裡！`,"棉花"); },9000); }
+  b.appendChild(nudgeEl); say(`${N()}，點點看這裡！`,"棉花"); }; nudgeT=setTimeout(fire,12000); }
 
 // ---------- hub menu ----------
 function showFree(){ clearStage(); showHubBg(); $("roomList").innerHTML=ROOMS.map((r,i)=>`<button data-i="${i}"><img src="${r.img}" alt="">${roomName(r.name)}<small class="lv">${stars(r)}</small></button>`).join(""); $("free").hidden=false; say(`${N()}，想去哪個房間玩？`); }

@@ -568,7 +568,7 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
 // AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
-const AV="87caa241", AQ=AV?"?v="+AV:"";
+const AV="2f8a9235", AQ=AV?"?v="+AV:"";
 function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);
@@ -729,7 +729,15 @@ function openRoom(i,m){
   pathChips(); lvShow();
   if(mode==="free"&&LV(room)===MAXLV){ say("聲音小偵探！聽聽看，找出是哪一樣東西！","旁白"); afterSpeech(()=>{ if(!quiz&&!quizDone&&mode==="free") startQuiz(); },700); return; }
   say(room.intro(N()), room.who||"棉花"); idle();
+  // front yard: after "who's home?", Cotton hops out by itself (tapping the door first still works too)
+  if(room.id==="door"&&mode==="free"){ const me=room, run=storyRun;
+    const wait=()=>{ if(room!==me||mode!=="free"||run!==storyRun||$("cot")) return;   // left the yard, or Cotton is already out
+      if(talking>0||!$("card").hidden) return setTimeout(wait,800);                   // let the current line finish first
+      doorCotton(); };
+    setTimeout(wait,1200); }
 }
+function doorCotton(){ const el=addChar("cotton","hop",61,2,38); el.id="cot"; el.classList.add("hop"); el.onclick=()=>tapChar("cotton",el);
+  say(`早安，${N()}！我是棉花！媽媽說今天要帶我出去玩！`); }
 function ping(el){ const r=el.getBoundingClientRect(), s=$("stage").getBoundingClientRect(), d=Math.max(r.width,r.height)*1.1;
   const p=document.createElement("div"); p.className="ping"; Object.assign(p.style,{width:d+"px",height:d+"px",left:(r.left-s.left+r.width/2-d/2)+"px",top:(r.top-s.top+r.height/2-d/2)+"px"});
   layer.appendChild(p); setTimeout(()=>p.remove(),900); }
@@ -744,8 +752,7 @@ function tapSpot(s,b){
   idle(); ping(b);
   if(quiz){ return answer(s[0],b); }
   showCard(s[0],thumb(room.id,s)); b.classList.add("found"); found.add(s[0]); swapCotton(); lvShow();
-  if(room.id==="door"&&s[0]==="door"&&!$("cot")){ afterSpeech(()=>{ if($("cot")) return; const el=addChar("cotton","hop",61,2,38); el.id="cot"; el.classList.add("hop"); el.onclick=()=>tapChar("cotton",el);
-      say(`早安，${N()}！我是棉花！媽媽說今天要帶我出去玩！`); },300,true); }
+  if(room.id==="door"&&s[0]==="door"&&!$("cot")){ afterSpeech(()=>{ if(!$("cot")) doorCotton(); },300,true); }
   check();
 }
 function tapChar(k,el){ if(mode==="story") return storyTap(k,el,()=>k==="cotton"?el.src:SPR[k].url);

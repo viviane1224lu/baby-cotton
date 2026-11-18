@@ -565,7 +565,7 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
 // AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
-const AV="3625684b", AQ=AV?"?v="+AV:"";
+const AV="a9a7ee31", AQ=AV?"?v="+AV:"";
 function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);

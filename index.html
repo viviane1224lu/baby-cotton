@@ -382,8 +382,8 @@ const STAGE_KEYS={
 const LEVEL_NAME=["","小小探索家","好奇發現家","棉花冒險家","聲音小偵探"], MAXLV=4;
 const LV=r=>Math.min(MAXLV,Math.max(1,(PROG.lv&&PROG.lv[r.id])||1));
 const stars=r=>"⭐".repeat(LV(r))+"☆".repeat(MAXLV-LV(r));
-// older kids find more: age 1–3 starts with 12 things, age 4–5 with everything in the room (30–36)
-function roomSpots(r){ const st=LV(r)+(ME.age>=4?2:0), keys=STAGE_KEYS[r.id]&&STAGE_KEYS[r.id][st]; return keys?r.spots.filter(s=>keys.includes(s[0])):r.spots; }
+// every age finds everything in the room (29–36 things): children learn at their own pace, age is only shown, never limits
+function roomSpots(r){ const st=LV(r)+2, keys=STAGE_KEYS[r.id]&&STAGE_KEYS[r.id][st]; return keys?r.spots.filter(s=>keys.includes(s[0])):r.spots; }
 const ROOMS=[
   {id:"door",name:"門口",who:"旁白",img:"img/room-door3.webp",
    intro:n=>`${n}，這裡是棉花的家！點一下門，看看誰在家？`,
@@ -565,7 +565,7 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
 // AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
-const AV="df80d247", AQ=AV?"?v="+AV:"";
+const AV="3625684b", AQ=AV?"?v="+AV:"";
 function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);

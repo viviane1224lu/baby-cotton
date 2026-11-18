@@ -44,10 +44,10 @@ button:focus-visible{outline:4px solid var(--accent);outline-offset:3px}
 .ping{position:absolute;z-index:4;border-radius:50%;pointer-events:none;border:4px solid #fff;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 45%,transparent),0 0 30px #fff;animation:ping .9s ease-out forwards}
 @keyframes ping{from{transform:scale(.5);opacity:1}to{transform:scale(1.25);opacity:0}}
 .spot:has(.nudge){z-index:6}
-.nudge{position:absolute;left:50%;top:50%;z-index:4;border-radius:50%;pointer-events:auto;cursor:pointer;border:5px solid #f97316;box-shadow:0 0 0 5px rgba(255,255,255,.9),0 0 30px 6px rgba(249,115,22,.65);animation:nudge 1s ease-in-out infinite}
+.nudge{position:absolute;z-index:4;box-sizing:border-box;border-radius:50%;pointer-events:auto;cursor:pointer;border:5px solid #f97316;box-shadow:0 0 0 5px rgba(255,255,255,.9),0 0 30px 6px rgba(249,115,22,.65);animation:nudge 1s ease-in-out infinite}
 .nudge::after{content:"👆";position:absolute;left:58%;top:62%;font-size:46px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));animation:poke .8s ease-in-out infinite}
 @keyframes poke{50%{transform:translate(-6px,-12px)}}
-@keyframes nudge{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.15)}}
+@keyframes nudge{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 
 /* characters painted by the user, cut from their sheets */
 .char{position:absolute;z-index:2;transform:translateX(-50%);cursor:pointer;filter:drop-shadow(0 8px 6px rgba(94,74,62,.18));animation:breathe 2.8s ease-in-out infinite;transition:opacity .5s}
@@ -529,7 +529,8 @@ function thumb(roomId,[k,x,y,w,h]){
 // ---------- stage fits a 16:9 painting inside the window ----------
 function fit(){ const a=$("app").getBoundingClientRect(); let w=a.width,h=w*9/16; if(h>a.height){h=a.height;w=h*16/9;}
   Object.assign($("stage").style,{width:w+"px",height:h+"px",left:(a.width-w)/2+"px",top:(a.height-h)/2+"px"}); }
-window.addEventListener("resize",()=>{ fit(); if(typeof sizeCanvas==="function") sizeCanvas(); }); fit();
+window.addEventListener("resize",()=>{ fit(); if(typeof sizeCanvas==="function") sizeCanvas();
+  if(nudgeEl){ const b=nudgeEl.parentElement, d=parseFloat(nudgeEl.style.width); nudgeEl.style.left=(b.clientWidth-d)/2+"px"; nudgeEl.style.top=(b.clientHeight-d)/2+"px"; } }); fit();
 
 // ---------- sound ----------
 // Voices: prefer the device's higher-quality voices; a parent can pick another in Settings.
@@ -563,7 +564,9 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Phones run out of memory if whole voice packs are decoded (hours of audio = GBs).
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
-function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
+// AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
+const AV="8f44214c", AQ=AV?"?v="+AV:"";
+function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);
   const box=(s,e,name)=>{ for(let o=s;o+8<=e;){ let sz=u32(o), h=8; if(sz===1){ sz=Number(v.getBigUint64(o+8)); h=16; } else if(sz===0) sz=e-o;
@@ -580,7 +583,7 @@ function adts(P,f0,f1){ let tot=0; for(let i=f0;i<f1;i++) tot+=P.sizes[i]+7; con
   for(let i=f0;i<f1;i++){ const L=P.sizes[i]+7; out.set([0xFF,0xF1,(1<<6)|(6<<2),(1<<6)|(L>>11),(L>>3)&0xFF,((L&7)<<5)|0x1F,0xFC],o);
     out.set(P.d.subarray(P.off[i],P.off[i]+P.sizes[i]),o+7); o+=L; } return out.buffer; }   // AAC-LC, 24 kHz, mono
 async function loadVoice(pack){ if(PACK_CACHE[pack]) return PACK_CACHE[pack];
-  const job=(async()=>{ try{ const d=new Uint8Array(await (await fetch(`audio/${pack}.mp4`)).arrayBuffer()); return Object.assign({d},mp4Frames(d)); }
+  const job=(async()=>{ try{ const d=new Uint8Array(await (await fetch(`audio/${pack}.mp4${AQ}`)).arrayBuffer()); return Object.assign({d},mp4Frames(d)); }
     catch(e){ delete PACK_CACHE[pack]; return null; } })();
   PACK_CACHE[pack]=job; return job; }
 async function getClip(pack,[off,dur]){ const k=pack+"@"+off; if(CLIP_CACHE.has(k)){ const c=CLIP_CACHE.get(k); CLIP_CACHE.delete(k); CLIP_CACHE.set(k,c); return c; }
@@ -594,7 +597,7 @@ async function getClip(pack,[off,dur]){ const k=pack+"@"+off; if(CLIP_CACHE.has(
   const c={b,off:Math.max(0,(s0-f0*1024)/SR-trim),dur};
   CLIP_CACHE.set(k,c); if(CLIP_CACHE.size>120) CLIP_CACHE.delete(CLIP_CACHE.keys().next().value);
   return c; }
-function loadAllVoices(){ ROLES.forEach(([who])=>{ const c=cast(who); ["","-x","-y","-z","-w","-n"].forEach(x=>{ loadIdx(c.zh+x); loadIdx(c.en+x); }); }); }
+function loadAllVoices(){ ROLES.forEach(([who])=>{ const c=cast(who); ["","-x","-y","-z","-w","-n","-m"].forEach(x=>{ loadIdx(c.zh+x); loadIdx(c.en+x); }); }); }
 // Settings: each character picks a Chinese and an English voice; 試聽 plays a sample
 const VNAME_EN={"曉雨":"Xiaoyu","曉臻":"Xiaozhen","雲哲":"Yunzhe","（小朋友）":" (child)","（男生）":" (boy)","（小女孩）":" (little girl)"};
 const vName=n=>LANG()==="en"?n.replace(/曉雨|曉臻|雲哲|（[^）]+）/g,m=>VNAME_EN[m]??m):LANG()==="cn"?toS(n):n;
@@ -606,14 +609,14 @@ function drawVoices(){ const opt=(lang,cur)=>VOICES[lang].map(([id,n])=>`<option
 drawVoices();
 $("packs").addEventListener("change",e=>{ const sel=e.target.closest("select"); if(!sel) return;
   ME.voices=ME.voices||{}; const w=sel.dataset.who; ME.voices[w]=Object.assign(cast(w),ME.voices[w]||{},{[sel.dataset.lang]:sel.value}); save();
-  ["","-x","-y","-z","-w","-n"].forEach(x=>loadIdx(sel.value+x)); });
+  ["","-x","-y","-z","-w","-n","-m"].forEach(x=>loadIdx(sel.value+x)); });
 $("packs").addEventListener("click",e=>{ const b=e.target.closest("[data-try]"); if(!b) return; unlockAudio(); muted=false;
   const r=ROLES.find(x=>x[0]===b.dataset.try); speak([[r[3],"zh"],["Hello! I am Cotton. Banana, apple, milk!","en"]],r[0]); });
 function zhChunks(t){ const nm=N(), out=[];
   t.split(nm).forEach((part,i)=>{ if(i) out.push(nm);
     part.split(/(?<=[！？。])/).forEach(c=>{ c=c.replace(/^[，、 ]+|[，、 ]+$/g,""); if(c&&!/^[！？。，、\s]+$/.test(c)) out.push(c); }); });
   return out; }
-let SYL=null; function loadSyl(){ return SYL||(SYL=fetch("audio/syl.json").then(r=>r.json()).catch(()=>{ SYL=null; return null; })); }
+let SYL=null; function loadSyl(){ return SYL||(SYL=fetch("audio/syl.json"+AQ).then(r=>r.json()).catch(()=>{ SYL=null; return null; })); }
 function playClip(buf,[off,dur],rate){ return new Promise(res=>{ try{ if(ac.state!=="running") ac.resume();
   const s=ac.createBufferSource(); s.buffer=buf; s.playbackRate.value=rate; s.connect(ac.destination); s.onended=()=>res(); curSrc=s; s.start(0,off,dur);
   setTimeout(res,(dur/rate+.6)*1000); }catch(e){ res(); } }); }
@@ -627,7 +630,7 @@ let talking=0, quietSince=0;   // lines still being spoken, and when the last on
 function speak(parts,who){ talking++; lastSpeech=speakNow(parts,who); lastSpeech.finally(()=>{ if(--talking===0) quietSince=Date.now(); }); return lastSpeech; }
 async function speakNow(parts,who="旁白"){ if(muted) return; const id=++speakId;
   try{ curSrc&&curSrc.stop(); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){}
-  const c=cast(who), packs=l=>(l==="en"?["","-x","-y","-z","-w","-n"]:["","-x","-y","-z","-w","-n","-s"]).map(x=>(l==="en"?c.en:c.zh)+x);
+  const c=cast(who), packs=l=>(l==="en"?["","-x","-y","-z","-w","-n","-m"]:["","-x","-y","-z","-w","-n","-m","-s"]).map(x=>(l==="en"?c.en:c.zh)+x);
   const idx={}; await Promise.all([...packs("zh"),...packs("en")].map(async p=>{ idx[p]=await loadIdx(p); })); if(id!==speakId) return;
   const seq=[]; parts.forEach(([t,l],pi)=>{ (l==="en"?enChunks(t):zhChunks(t)).forEach(c=>seq.push([l,c,pi])); });
   const find=(l,t)=>packs(l).find(p=>idx[p]&&idx[p][l+"|"+t]);
@@ -974,7 +977,9 @@ function idle(){ stopNudge(); if(mode==="hub") return; const fire=()=>{
   if(!left.length||quiz) return;
   const b=left[Math.floor(Math.random()*left.length)], r=b.getBoundingClientRect(), d=Math.min(150,Math.max(80,Math.min(r.width,r.height)));
   // the ring lives inside the object, so it stays on it even if the screen turns or resizes
-  nudgeEl=document.createElement("div"); nudgeEl.className="nudge"; Object.assign(nudgeEl.style,{width:d+"px",height:d+"px"});
+  nudgeEl=document.createElement("div"); nudgeEl.className="nudge";
+  // exact pixel position at the middle of the object (works the same in every browser, LINE included)
+  Object.assign(nudgeEl.style,{width:d+"px",height:d+"px",left:(b.clientWidth-d)/2+"px",top:(b.clientHeight-d)/2+"px"});
   b.appendChild(nudgeEl); say(`${N()}，點點看這裡！`,"棉花"); }; nudgeT=setTimeout(fire,12000); }
 
 // ---------- hub menu ----------

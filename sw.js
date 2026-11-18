@@ -1,6 +1,6 @@
 // Offline support: pictures and voices are kept after the first time they load.
 // The page itself is always checked online first, so updates arrive right away.
-const CACHE = "baby-cotton-v4";
+const CACHE = "baby-cotton-v5";
 self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"]))); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", e => {
@@ -13,6 +13,6 @@ self.addEventListener("fetch", e => {
       .catch(() => caches.match(req).then(r => r || caches.match("index.html"))));
     return;
   }
-  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {   // cache first
+  e.respondWith(caches.match(req).then(hit => hit || fetch(req, { cache: "no-cache" }).then(r => {   // never keep a stale copy from the browser's own cache   // cache first
     if (r.ok) { const c = r.clone(); caches.open(CACHE).then(x => x.put(req, c)); } return r; })));
 });

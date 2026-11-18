@@ -76,6 +76,8 @@ button:focus-visible{outline:4px solid var(--accent);outline-offset:3px}
   background:rgba(255,252,246,.94);border:2px dashed #dcc3b0;border-radius:18px;padding:16px 22px 10px;font-size:clamp(17px,3.2vmin,26px);line-height:1.4;box-shadow:0 8px 24px rgba(94,74,62,.15)}
 .who[data-who="旁白"]{background:#a48d7c}.who[data-who="媽媽"]{background:#e98fa3}
 .who{position:absolute;top:-15px;left:18px;background:var(--leaf);color:#fff;border-radius:999px;padding:1px 14px;font-size:clamp(13px,2.4vmin,17px)}
+.say .xl{pointer-events:auto;margin-left:10px;font:inherit;font-size:16px;padding:4px 12px;border-radius:999px;border:1.5px dashed #e7cdbb;background:#fff7ef;color:#c2410c;vertical-align:middle;cursor:pointer;white-space:nowrap}
+#xlTxt{display:block;font-size:.82em;color:var(--pencil);margin-top:4px}
 #replay{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:12px;z-index:6;width:58px;height:58px;font-size:26px;display:grid;place-items:center}
 
 /* word card */
@@ -193,7 +195,7 @@ button:focus-visible{outline:4px solid var(--accent);outline-offset:3px}
     <button class="chip iconbtn" id="sndBtn" aria-label="音效">🔊</button>
   </div>
 
-  <div class="say" id="sayBox" hidden><span class="who" id="who">棉花</span><span id="line"></span></div>
+  <div class="say" id="sayBox" hidden><span class="who" id="who">棉花</span><span id="line"></span><button class="xl" id="xlBtn" type="button" hidden></button><span id="xlTxt" hidden></span></div>
   <button class="chip" id="replay" aria-label="再說一次" hidden>🗣️</button>
   <button class="go" id="next" hidden></button>
 
@@ -586,7 +588,7 @@ async function getClip(pack,[off,dur]){ const k=pack+"@"+off; if(CLIP_CACHE.has(
   const c={b,off:Math.max(0,(s0-f0*1024)/SR-trim),dur};
   CLIP_CACHE.set(k,c); if(CLIP_CACHE.size>120) CLIP_CACHE.delete(CLIP_CACHE.keys().next().value);
   return c; }
-function loadAllVoices(){ ROLES.forEach(([who])=>{ const c=cast(who); ["","-x","-y","-z"].forEach(x=>{ loadIdx(c.zh+x); loadIdx(c.en+x); }); }); }
+function loadAllVoices(){ ROLES.forEach(([who])=>{ const c=cast(who); ["","-x","-y","-z","-n"].forEach(x=>{ loadIdx(c.zh+x); loadIdx(c.en+x); }); }); }
 // Settings: each character picks a Chinese and an English voice; 試聽 plays a sample
 const VNAME_EN={"曉雨":"Xiaoyu","曉臻":"Xiaozhen","雲哲":"Yunzhe","（小朋友）":" (child)","（男生）":" (boy)","（小女孩）":" (little girl)"};
 const vName=n=>LANG()==="en"?n.replace(/曉雨|曉臻|雲哲|（[^）]+）/g,m=>VNAME_EN[m]??m):LANG()==="cn"?toS(n):n;
@@ -598,7 +600,7 @@ function drawVoices(){ const opt=(lang,cur)=>VOICES[lang].map(([id,n])=>`<option
 drawVoices();
 $("packs").addEventListener("change",e=>{ const sel=e.target.closest("select"); if(!sel) return;
   ME.voices=ME.voices||{}; const w=sel.dataset.who; ME.voices[w]=Object.assign(cast(w),ME.voices[w]||{},{[sel.dataset.lang]:sel.value}); save();
-  ["","-x","-y","-z"].forEach(x=>loadIdx(sel.value+x)); });
+  ["","-x","-y","-z","-n"].forEach(x=>loadIdx(sel.value+x)); });
 $("packs").addEventListener("click",e=>{ const b=e.target.closest("[data-try]"); if(!b) return; unlockAudio(); muted=false;
   const r=ROLES.find(x=>x[0]===b.dataset.try); speak([[r[3],"zh"],["Hello! I am Cotton. Banana, apple, milk!","en"]],r[0]); });
 function zhChunks(t){ const nm=N(), out=[];
@@ -617,17 +619,21 @@ const afterSpeech=(fn,ms=600,always=false)=>{ const p=lastSpeech; p.then(()=>{ i
 function speak(parts,who){ lastSpeech=speakNow(parts,who); return lastSpeech; }
 async function speakNow(parts,who="旁白"){ if(muted) return; const id=++speakId;
   try{ curSrc&&curSrc.stop(); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){}
-  const c=cast(who), packs=l=>["","-x","-y","-z"].map(x=>(l==="en"?c.en:c.zh)+x);
+  const c=cast(who), packs=l=>["","-x","-y","-z","-n"].map(x=>(l==="en"?c.en:c.zh)+x);
   const idx={}; await Promise.all([...packs("zh"),...packs("en")].map(async p=>{ idx[p]=await loadIdx(p); })); if(id!==speakId) return;
   const seq=[]; parts.forEach(([t,l],pi)=>{ (l==="en"?enChunks(t):zhChunks(t)).forEach(c=>seq.push([l,c,pi])); });
   const find=(l,t)=>packs(l).find(p=>idx[p]&&idx[p][l+"|"+t]);
+  // the child's name: try "ellie" as "Ellie"; if it was never recorded, the same voice says 小朋友 / friend instead
+  const nameKey=(l,t)=>{ if(t!==N()) return t; const T=/^[a-z]/i.test(t)?t[0].toUpperCase()+t.slice(1).toLowerCase():t;
+    return find(l,t)?t:find(l,T)?T:(l==="en"?"friend":"小朋友"); };
+  seq.forEach(c=>{ c[1]=nameKey(c[0],c[1]); });
   const clips=seq.map(([l,t])=>{ const p=find(l,t); return p?getClip(p,idx[p][l+"|"+t]).catch(()=>null):null; });  // fetch/decode all lines up front
   const rest=ms=>new Promise(r=>setTimeout(r,ms)); let prev=null;
   for(const [i,[l,t,pi]] of seq.entries()){ if(id!==speakId||muted) return;
     if(prev!==null) await rest(pi!==prev?900:350); prev=pi; if(id!==speakId||muted) return;
     const C=clips[i]&&await clips[i]; if(id!==speakId||muted) return;
     if(C) await playClip(C.b,[C.off,C.dur],1);
-    else if(t===N()) await browserSay(t,l,1);   // a name with no recording: the phone's own voice says it
+    else if(t===N()||t==="friend"||t==="小朋友") continue;   // never switch to a different voice mid-sentence
     else await browserSay(t,l); } }
 // iPhone/iPad only allow speech after a tap: say something tiny inside the first tap
 function unlockAudio(){ try{ const u=new SpeechSynthesisUtterance(" "); u.volume=0; speechSynthesis.speak(u); }catch(e){}
@@ -643,8 +649,15 @@ let lastSay="";
 let lastWho="旁白";
 function sayParts(text){ const e=LANG()==="en"&&toEn(text); return e?[[e,"en"]]:[[text,"zh"]]; }
 let lastParts=null;
-function sayAs(shown,parts,who="旁白"){ lastSay=null; lastParts=parts; lastWho=who; $("line").textContent=shown; $("who").textContent=showWho(who); $("who").dataset.who=who; $("sayBox").hidden=false; speak(parts,who); }
-function say(text,who="棉花"){ lastParts=null; lastSay=text; lastWho=who; $("line").textContent=show(text); $("who").textContent=showWho(who); $("who").dataset.who=who; $("sayBox").hidden=false; speak(sayParts(text),who); }
+// 🔊 中文 / 🔊 English: hear the whole line in the other language (and see it underneath)
+let pair=null;
+function xlShow(){ const b=$("xlBtn"), E=LANG()==="en"; $("xlTxt").hidden=true;
+  if(!pair||!(E?pair.zh:pair.en)){ b.hidden=true; return; } b.textContent=E?"🔊 中文":"🔊 English"; b.hidden=false; }
+$("xlBtn").addEventListener("click",e=>{ e.stopPropagation(); if(!pair) return; const E=LANG()==="en";
+  $("xlTxt").textContent=E?(ME.lang==="cn"?toS(pair.zh):pair.zh):pair.en; $("xlTxt").hidden=false;
+  speak(E?[[pair.zh,"zh"]]:[[pair.en,"en"]],lastWho); });
+function sayAs(shown,parts,who="旁白"){ pair=null; xlShow(); lastSay=null; lastParts=parts; lastWho=who; $("line").textContent=shown; $("who").textContent=showWho(who); $("who").dataset.who=who; $("sayBox").hidden=false; speak(parts,who); }
+function say(text,who="棉花"){ pair={zh:text,en:toEn(text)}; xlShow(); lastParts=null; lastSay=text; lastWho=who; $("line").textContent=show(text); $("who").textContent=showWho(who); $("who").dataset.who=who; $("sayBox").hidden=false; speak(sayParts(text),who); }
 $("replay").onclick=()=>speak(lastParts||sayParts(lastSay),lastWho);
 
 // ---------- word card ----------
@@ -653,10 +666,10 @@ function showCard(k,src,who="旁白"){
   const [zh,zy,en,fact,py,factEn,zhS,factS]=k==="me"?[N(),"","Me",`我是${N()}，我是棉花的好朋友！`,"","I'm Cotton's friend!",N(),`我是${N()}，我是棉花的好朋友！`]:W[k], little=ME.age<=3, L=LANG();
   $("cImg").src=src; let spoken;
   if(L==="en"){ $("cZy").textContent=""; $("cZh").textContent=en; $("cEn").textContent=`${zhS}  ${py}`;
-    $("card").hidden=false; ding(); spoken=speak([[en,"en"],[zh,"zh"],[zh,"zh"]],who); $("line").textContent=factEn; }
+    $("card").hidden=false; ding(); spoken=speak([[en,"en"],[zh,"zh"],[zh,"zh"],[factEn,"en"]],who); $("line").textContent=factEn; }
   else { const cn=L==="cn"; $("cZh").textContent=cn?zhS:zh; $("cZy").textContent=little?"":(cn?py:zy); $("cEn").textContent=en;
     $("card").hidden=false; ding(); spoken=speak([[zh,"zh"],[en,"en"],[fact,"zh"]],who); $("line").textContent=cn?factS:fact; }
-  spoken=spoken||Promise.resolve(); lastSay=fact;
+  spoken=spoken||Promise.resolve(); lastSay=fact; pair={zh:fact,en:factEn}; xlShow();
   if(k!=="me"&&!PROG.words.includes(k)){ PROG.words.push(k); save(); }
   clearTimeout(cardT); const me=++cardId;
   spoken.then(()=>{ if(me===cardId) cardT=setTimeout(()=>$("card").hidden=true,1500); }); }

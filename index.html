@@ -570,7 +570,7 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
 // AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
-const AV="3f12aea8", AQ=AV?"?v="+AV:"";
+const AV="f3708c2c", AQ=AV?"?v="+AV:"";
 function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);
@@ -779,14 +779,15 @@ function askNow(again){ const k=quiz.now, [zh,,en,fact,,factEn]=W[k], lv=LV(room
   if(lv===4){ const first=again?(E?"Listen again!":"再聽一次！"):(E?"Guess what it is!":"猜猜看，是什麼？");
     sayAs("🔊 "+(E?first:show(first)),E?[[first,"en"],[factEn,"en"]]:[[first,"zh"],[fact,"zh"]]); return; }
   if(E){ sayAs(`${N()}, where is ${zh}?`,[[`${N()}, where is`,"en"],[zh,"zh"]]); return; }
-  say(`${N()}，${zh}在哪裡？點點看！`,"旁白"); }
-function answer(k,el){ if(k===quiz.now){ yay(); quiz.left.shift(); const E=LANG()==="en"; $("line").textContent=E?`Yes! That's ${W[k][0]}!`:show(`答對了！這是${W[k][0]}！`); speak(E?[["Yes! That's","en"],[W[k][0],"zh"]]:[[`答對了！這是${W[k][0]}！`,"zh"],[W[k][2],"en"]],"旁白"); afterSpeech(askQ,700); }
+  // Chinese mode mirrors it: ask with the English word ("Vivian，Car 在哪裡？") so Chinese speakers practise English
+  sayAs(`${N()}，${en} ${show("在哪裡？")}`,[[`${N()}，`,"zh"],[en,"en"],["在哪裡？點點看！","zh"]]); }
+function answer(k,el){ if(k===quiz.now){ yay(); quiz.left.shift(); const E=LANG()==="en"; $("line").textContent=E?`Yes! That's ${W[k][0]}!`:show(`答對了！這是${W[k][0]}！`); if(!E) $("line").textContent=`${show("答對了！這是")} ${W[k][2]}！`; speak(E?[["Yes! That's","en"],[W[k][0],"zh"]]:[["答對了！這是","zh"],[W[k][2],"en"]],"旁白"); afterSpeech(askQ,700); }
   else { oops(); const lv=LV(room), E=LANG()==="en";
     if(lv===4) return askNow(true);
     if(lv===3){ if(E){ const z=`這是${W[k][0]}喔。再找找${W[quiz.now][0]}在哪裡？`; return sayAs(z,[[z,"zh"]]); }
       const q=`That's the ${W[k][2].toLowerCase()}. Where is the ${W[quiz.now][2].toLowerCase()}?`; return sayAs(q,[[q,"en"]]); }
     if(E){ const a=W[k][0], b=W[quiz.now][0]; return sayAs(`That's ${a}. Where is ${b}?`,[["That's","en"],[W[k][0],"zh"],["Where is","en"],[W[quiz.now][0],"zh"]]); }
-    say(`這是${W[k][0]}喔。再找找${W[quiz.now][0]}在哪裡？`,"旁白"); } }
+    const a=W[k][2], b=W[quiz.now][2]; sayAs(`${show("這是")} ${a}。${b} ${show("在哪裡？")}`,[["這是","zh"],[a,"en"],[b,"en"],["在哪裡？","zh"]]); } }
 function roomDone(){
   yay(); petals(); stopNudge();
   const i=ROOMS.indexOf(room);

@@ -229,7 +229,7 @@ body:has(#card:not([hidden])) #sayBox{z-index:9}
     </div>
   </div>
 
-  <div class="overlay" id="free" hidden><div class="panel"><h2>棉花的家</h2><div class="sub">想去哪個房間玩？</div><div class="rooms" id="roomList"></div><button class="go" data-close>回首頁</button></div></div>
+  <div class="overlay" id="free" hidden><div class="panel"><h2 id="freeTitle">棉花的家</h2><div class="sub" id="freeSub">想去哪個房間玩？</div><div class="rooms" id="roomList"></div><button class="go" data-close>回首頁</button></div></div>
   <div class="overlay" id="paintPick" hidden><div class="panel"><h2 id="paintTitle">魔法畫室</h2><div class="sub" id="paintSub">想畫在哪裡？</div><div class="rooms" id="paintList"></div><button class="go" data-close>回首頁</button></div></div>
   <div id="paintBar" hidden></div>
   <div class="overlay" id="bookPanel" hidden><div class="panel"><h2 id="bookTitle">成長紀錄</h2><div class="sub" id="bookSub"></div><div class="book" id="bookList"></div><button class="go" data-close>回首頁</button></div></div>
@@ -349,6 +349,8 @@ function applyLangUI(){ const L=LANG();
   $("mStory").innerHTML=`<span class="big">🗺️</span>${T3("故事冒險","Story")}<small>${T3("關卡遊戲","Adventure")}</small>`;
   $("mBook").innerHTML=`<span class="big">⭐</span>${T3("成長紀錄","My Words")}<small>${T3("學會的字","What I learned")}</small>`;
   $("mPaint").innerHTML=`<span class="big">🎨</span>${T3("魔法畫室","Magic Studio")}<small>${T3("畫畫、上色","Draw & color")}</small>`;
+  $("freeTitle").textContent=T3("棉花的家","Cotton's Home"); $("freeSub").textContent=T3("想去哪個房間玩？","Which room do you want to play in?");
+  document.querySelectorAll("[data-close]").forEach(b=>b.textContent=T3("回首頁","Home")); $("doneBtn").textContent=T3("回首頁","Home");
   $("paintTitle").textContent=T3("魔法畫室","Magic Studio"); $("paintSub").textContent=T3("想畫在哪裡？","Where do you want to draw?");
   document.querySelector(".title .zh").textContent=T3("小棉花的冒險日記","Cotton's Adventure Diary");
   $("ribName").parentNode.innerHTML=L==="en"?`<b id="ribName"></b>, come play at Cotton's house!`:`<b id="ribName"></b>${T3("，一起來棉花家玩！","")}`;
@@ -568,7 +570,7 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
 // AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
-const AV="2f8a9235", AQ=AV?"?v="+AV:"";
+const AV="3f12aea8", AQ=AV?"?v="+AV:"";
 function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);
@@ -716,7 +718,10 @@ function showHub(){
   say(`嗨，${N()}！我是棉花！來看看我的家，認識好多好多東西吧！`);
 }
 let mode="hub", room=null, found=new Set(), quiz=null;
-function pathChips(){ $("path").innerHTML=ROOMS.map((r,i)=>`<span class="${i<PROG.story?"done":i===PROG.story&&mode==="story"&&r===room?"now":r===room?"now":i>PROG.story?"lock":""}">${i>PROG.story?"🔒 ":""}${roomName(r.name)}</span>`).join(""); $("path").hidden=false; }
+// rooms open one by one: the next room unlocks once this room's level 1 is passed (or the story has reached it)
+const passedRoom=i=>i<PROG.story||(((PROG.lv||{})[ROOMS[i].id])||1)>=2;
+const roomOpen=i=>i===0||i<=PROG.story||passedRoom(i-1);
+function pathChips(){ $("path").innerHTML=ROOMS.map((r,i)=>`<span class="${r===room?"now":passedRoom(i)?"done":!roomOpen(i)?"lock":""}">${roomOpen(i)?"":"🔒 "}${roomName(r.name)}</span>`).join(""); $("path").hidden=false; }
 
 function openRoom(i,m){
   clearStage(); mode=m; room=ROOMS[i]; quizDone=false; quiz=null; OUTFIT=room.outfit||"home"; found=new Set(); quiz=null; $("homeBtn").hidden=false;
@@ -773,12 +778,14 @@ function askNow(again){ const k=quiz.now, [zh,,en,fact,,factEn]=W[k], lv=LV(room
               else { const q=`${N()}, where is the ${en.toLowerCase()}?`; sayAs(q,[[q,"en"]]); } return; }
   if(lv===4){ const first=again?(E?"Listen again!":"再聽一次！"):(E?"Guess what it is!":"猜猜看，是什麼？");
     sayAs("🔊 "+(E?first:show(first)),E?[[first,"en"],[factEn,"en"]]:[[first,"zh"],[fact,"zh"]]); return; }
+  if(E){ sayAs(`${N()}, where is ${zh}?`,[[`${N()}, where is`,"en"],[zh,"zh"]]); return; }
   say(`${N()}，${zh}在哪裡？點點看！`,"旁白"); }
-function answer(k,el){ if(k===quiz.now){ yay(); quiz.left.shift(); $("line").textContent=show(`答對了！這是${W[k][0]}！`); speak(LANG()==="en"?[[toEn(`答對了！這是${W[k][0]}！`),"en"],[W[k][0],"zh"]]:[[`答對了！這是${W[k][0]}！`,"zh"],[W[k][2],"en"]],"旁白"); afterSpeech(askQ,700); }
+function answer(k,el){ if(k===quiz.now){ yay(); quiz.left.shift(); const E=LANG()==="en"; $("line").textContent=E?`Yes! That's ${W[k][0]}!`:show(`答對了！這是${W[k][0]}！`); speak(E?[["Yes! That's","en"],[W[k][0],"zh"]]:[[`答對了！這是${W[k][0]}！`,"zh"],[W[k][2],"en"]],"旁白"); afterSpeech(askQ,700); }
   else { oops(); const lv=LV(room), E=LANG()==="en";
     if(lv===4) return askNow(true);
     if(lv===3){ if(E){ const z=`這是${W[k][0]}喔。再找找${W[quiz.now][0]}在哪裡？`; return sayAs(z,[[z,"zh"]]); }
       const q=`That's the ${W[k][2].toLowerCase()}. Where is the ${W[quiz.now][2].toLowerCase()}?`; return sayAs(q,[[q,"en"]]); }
+    if(E){ const a=W[k][0], b=W[quiz.now][0]; return sayAs(`That's ${a}. Where is ${b}?`,[["That's","en"],[W[k][0],"zh"],["Where is","en"],[W[quiz.now][0],"zh"]]); }
     say(`這是${W[k][0]}喔。再找找${W[quiz.now][0]}在哪裡？`,"旁白"); } }
 function roomDone(){
   yay(); petals(); stopNudge();
@@ -994,14 +1001,16 @@ function idle(){ stopNudge(); if(mode==="hub") return; const fire=()=>{
   b.appendChild(nudgeEl); say(`${N()}，點點看這裡！`,"棉花"); }; nudgeT=setTimeout(fire,12000); }
 
 // ---------- hub menu ----------
-function showFree(){ clearStage(); showHubBg(); $("roomList").innerHTML=ROOMS.map((r,i)=>`<button data-i="${i}"><img src="${r.img}" alt="">${roomName(r.name)}<small class="lv">${stars(r)}</small></button>`).join(""); $("free").hidden=false; say(`${N()}，想去哪個房間玩？`); }
+function showFree(){ clearStage(); showHubBg(); $("roomList").innerHTML=ROOMS.map((r,i)=>`<button data-i="${i}" ${roomOpen(i)?"":"disabled"}><img src="${r.img}" alt="">${roomOpen(i)?"":"🔒 "}${roomName(r.name)}<small class="lv">${stars(r)}</small></button>`).join(""); $("free").hidden=false; say(`${N()}，想去哪個房間玩？`); }
 function showHubBg(){ $("bg").src="img/hub.webp"; $("homeBtn").hidden=true; }
-$("roomList").addEventListener("click",e=>{ const b=e.target.closest("[data-i]"); if(!b) return; $("free").hidden=true; ding(); openRoom(+b.dataset.i,"free"); });
+$("roomList").addEventListener("click",e=>{ const b=e.target.closest("[data-i]"); if(!b||b.disabled||!roomOpen(+b.dataset.i)) return; $("free").hidden=true; ding(); openRoom(+b.dataset.i,"free"); });
 $("mPaint").onclick=()=>{ ding(); showPaintPick(); };
 $("mFree").onclick=()=>{ ding(); showFree(); };
 $("mStory").onclick=()=>{ ding(); playStory(PROG.story>=STORY.length?0:PROG.story); };
 $("mBook").onclick=()=>{ ding(); const ks=PROG.words.filter(k=>W[k]);
-  $("bookTitle").textContent=`${N()}的成長紀錄`; $("bookSub").textContent=ks.length?`已經學會 ${ks.length} 個字，故事冒險走到第 ${Math.min(PROG.story+1,ROOMS.length)} 站`:"還沒有學會的字，快去探險吧！";
+  const st=Math.min(PROG.story+1,ROOMS.length);
+  if(LANG()==="en"){ $("bookTitle").textContent=`${N()}'s Words`; $("bookSub").textContent=ks.length?`${ks.length} words learned · story stop ${st}`:"No words yet. Let's go explore!"; }
+  else { $("bookTitle").textContent=show(`${N()}的成長紀錄`); $("bookSub").textContent=show(ks.length?`已經學會 ${ks.length} 個字，故事冒險走到第 ${st} 站`:"還沒有學會的字，快去探險吧！"); }
   $("bookList").innerHTML=ks.map(k=>{ let src=""; for(const r of ROOMS){ const s=r.spots.find(s=>s[0]===k); if(s){src=thumb(r.id,s);break;} } if(!src&&SPR[k]) src=SPR[k].url; if(!src&&k==="cotton") src=SPR.stand.url;
     return `<span><img src="${src}" alt="">${W[k][0]}<b>${W[k][2]}</b></span>`; }).join("");
   $("bookPanel").hidden=false; };

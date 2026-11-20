@@ -591,7 +591,7 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
 // AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
-const AV="ae1c2df6", AQ=AV?"?v="+AV:"";
+const AV="dd399b27", AQ=AV?"?v="+AV:"";
 function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);
@@ -685,6 +685,9 @@ let ac=null; function tone(fs,d=.12){ if(muted) return; try{ ac=ac||new (window.
   fs.forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*d; o.type="sine"; o.frequency.value=f;
   g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.2,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+d*1.8);
   o.connect(g).connect(ac.destination); o.start(t); o.stop(t+d*2); }); }catch(e){} }
+// Safari keeps sound asleep until a tap wakes it (and puts it back to sleep in the background): wake it on every touch
+function wakeAudio(){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); if(ac.state!=="running") ac.resume(); }catch(e){} }
+["pointerdown","touchend","keydown"].forEach(ev=>document.addEventListener(ev,wakeAudio,true));
 const ding=()=>tone([1047,1568],.1), yay=()=>tone([523,659,784,1047,1319],.14), oops=()=>tone([392,330],.12);
 $("sndBtn").onclick=()=>{ muted=!muted; $("sndBtn").textContent=muted?"🔇":"🔊"; if(muted) try{speechSynthesis.cancel();}catch(e){} };
 

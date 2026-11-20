@@ -686,7 +686,10 @@ let ac=null; function tone(fs,d=.12){ if(muted) return; try{ ac=ac||new (window.
   g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.2,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+d*1.8);
   o.connect(g).connect(ac.destination); o.start(t); o.stop(t+d*2); }); }catch(e){} }
 // Safari keeps sound asleep until a tap wakes it (and puts it back to sleep in the background): wake it on every touch
-function wakeAudio(){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); if(ac.state!=="running") ac.resume(); }catch(e){} }
+// Safari on Mac can leave it "interrupted" (another tab played sound, the window was hidden) or closed: then start a fresh one
+function wakeAudio(){ try{ const AC=window.AudioContext||window.webkitAudioContext;
+  if(ac&&ac.state!=="running"&&ac.state!=="suspended"){ try{ const p=ac.close(); p&&p.catch(()=>{}); }catch(e){} ac=null; }
+  ac=ac||new AC(); if(ac.state!=="running") ac.resume(); }catch(e){} }
 ["pointerdown","touchend","keydown"].forEach(ev=>document.addEventListener(ev,wakeAudio,true));
 const ding=()=>tone([1047,1568],.1), yay=()=>tone([523,659,784,1047,1319],.14), oops=()=>tone([392,330],.12);
 $("sndBtn").onclick=()=>{ muted=!muted; $("sndBtn").textContent=muted?"🔇":"🔊"; if(muted) try{speechSynthesis.cancel();}catch(e){} };

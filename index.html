@@ -1066,5 +1066,14 @@ $("bg").src="img/hub.webp";
 loadAllVoices();
 loadAll().then(()=>{ $("setupHero").src=SPR.happy.url; $("pkBoy").src=SPR.boy.url; $("pkGirl").src=SPR.girl.url; $("play").disabled=false; playState="start"; playTxt(); })
   .catch(()=>{ $("play").disabled=false; playState="start"; playTxt(); });
+// Sound check for parents: open the link with ?debug to see why there is no sound (shown only then)
+if(/[?&]debug/.test(location.search)){ const D={clips:0,tts:0,fail:0,err:[]}, box=document.createElement("div");
+  box.style.cssText="position:fixed;left:8px;right:8px;bottom:8px;z-index:99;background:#222;color:#fff;font:14px/1.5 monospace;padding:10px;border-radius:10px;white-space:pre-wrap";
+  document.body.appendChild(box); const note=m=>{ D.err.push(String(m).slice(0,120)); if(D.err.length>4) D.err.shift(); };
+  addEventListener("error",e=>note(e.message)); addEventListener("unhandledrejection",e=>note(e.reason&&(e.reason.message||e.reason)));
+  const pc=playClip; playClip=function(...a){ D.clips++; return pc.apply(this,a); };
+  const bs=browserSay; browserSay=function(...a){ D.tts++; return bs.apply(this,a); };
+  const gc=getClip; getClip=async function(...a){ try{ const c=await gc.apply(this,a); if(!c) D.fail++; return c; }catch(e){ D.fail++; note("decode: "+(e&&(e.message||e.name)||e)); throw e; } };
+  setInterval(()=>{ box.textContent=`聲音檢查 Sound check\n聲音引擎 audio: ${ac?ac.state+" "+ac.sampleRate+"Hz":"還沒開 not started"}   靜音 muted: ${muted}\n播出配音 clips: ${D.clips}   電腦語音 tts: ${D.tts}   失敗 failed: ${D.fail}\n${D.err.join("\n")||"沒有錯誤 no errors"}\n${navigator.userAgent.replace(/^.*?\) /,"")}`; },500); }
 </script>
 <script>if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>

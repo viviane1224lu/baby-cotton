@@ -338,7 +338,7 @@ function toEn(t){ const nm=N(), key=String(t).split(nm).join("{n}"); let e=EN_FI
   if(!e) for(const [re,f] of EN_PAT){ const m=key.match(re); if(m){ e=f(m); break; } }
   return e?e.split("{n}").join(nm):null; }
 // what the child sees for a Chinese line in the chosen mode
-function show(t){ const L=LANG(); return L==="cn"?toS(t):L==="en"?(toEn(t)||toS(t)):t; }
+function show(t){ const L=LANG(); return L==="cn"?toS(t):L==="en"?(toEn(t)||t):t; }
 function showWho(w){ const L=LANG(); return L==="en"?(WHO_EN[w]||w):L==="cn"?toS(w):w; }
 function enChunks(t){ const nm=N(), out=[];
   String(t).split(nm).forEach((part,i)=>{ if(i) out.push(nm);
@@ -591,7 +591,7 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
 // AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
-const AV="dd399b27", AQ=AV?"?v="+AV:"";
+const AV="c9b8b62a", AQ=AV?"?v="+AV:"";
 function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);
@@ -643,7 +643,8 @@ function zhChunks(t){ const nm=N(), out=[];
     part.split(/(?<=[！？。])/).forEach(c=>{ c=c.replace(/^[，、 ]+|[，、 ]+$/g,""); if(c&&!/^[！？。，、\s]+$/.test(c)) out.push(c); }); });
   return out; }
 let SYL=null; function loadSyl(){ return SYL||(SYL=fetch("audio/syl.json"+AQ).then(r=>r.json()).catch(()=>{ SYL=null; return null; })); }
-function playClip(buf,[off,dur],rate){ return new Promise(res=>{ try{ if(ac.state!=="running") ac.resume();
+// wait (briefly) for Safari to wake the sound before starting: otherwise the first word — usually the name — is lost
+function playClip(buf,[off,dur],rate){ return new Promise(async res=>{ try{ if(ac.state!=="running"){ try{ await Promise.race([ac.resume(),new Promise(r=>setTimeout(r,800))]); }catch(e){} }
   const s=ac.createBufferSource(); s.buffer=buf; s.playbackRate.value=rate; s.connect(ac.destination); s.onended=()=>res(); curSrc=s; s.start(0,off,dur);
   setTimeout(res,(dur/rate+.6)*1000); }catch(e){ res(); } }); }
 function browserSay(t,l,rate=.72){ return new Promise(res=>{ const S=window.speechSynthesis; if(!S) return res();
@@ -715,7 +716,7 @@ let cardT=null, cardId=0;
 function showCard(k,src,who="旁白"){
   const [zh,zy,en,fact,py,factEn,zhS,factS]=k==="me"?[N(),"","Me",`我是${N()}，我是棉花的好朋友！`,"","I'm Cotton's friend!",N(),`我是${N()}，我是棉花的好朋友！`]:W[k], little=ME.age<=3, L=LANG();
   $("cImg").src=src; let spoken;
-  if(L==="en"){ $("cZy").textContent=""; $("cZh").textContent=en; $("cEn").textContent=`${zhS}  ${py}`;
+  if(L==="en"){ $("cZy").textContent=""; $("cZh").textContent=en; $("cEn").textContent=`${zh}  ${py}`;
     $("card").hidden=false; ding(); spoken=speak([[en,"en"],[zh,"zh"],[zh,"zh"],[factEn,"en"]],who); $("line").textContent=factEn; }
   else { const cn=L==="cn"; $("cZh").textContent=cn?zhS:zh; $("cZy").textContent=little?"":(cn?py:zy); $("cEn").textContent=en;
     $("card").hidden=false; ding(); spoken=speak([[zh,"zh"],[en,"en"],[fact,"zh"]],who); $("line").textContent=cn?factS:fact; }
@@ -1004,7 +1005,7 @@ function drawBar(){
    +`<button class="tool" data-t="erase" aria-label="橡皮擦" aria-pressed="${pen.erase}">🧽</button><button class="tool" data-t="undo" aria-label="上一步">↩️</button><button class="tool" data-t="clear" aria-label="全部擦掉">🗑️</button><button class="tool done" data-t="done" aria-label="完成">⭐</button>`; }
 $("paintBar").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return;
   if(b.dataset.c){ pen.color=b.dataset.c; pen.erase=false; const [zh,,en]=W[pen.color]; speak(LANG()==="en"?[[en,"en"],[zh,"zh"]]:[[zh,"zh"],[en,"en"]],"旁白");
-    $("line").textContent=LANG()==="en"?`${en}  ${W[pen.color][6]} ${W[pen.color][4]}`:LANG()==="cn"?`${W[pen.color][6]}  ${en}`:`${zh}  ${en}`; }
+    $("line").textContent=LANG()==="en"?`${en}  ${W[pen.color][0]} ${W[pen.color][4]}`:LANG()==="cn"?`${W[pen.color][6]}  ${en}`:`${zh}  ${en}`; }
   else if(b.dataset.s){ pen.size=+b.dataset.s; pen.erase=false; ding(); }
   else if(b.dataset.t==="erase"){ pen.erase=!pen.erase; ding(); }
   else if(b.dataset.t==="undo"){ strokes.pop(); redraw(); ding(); }

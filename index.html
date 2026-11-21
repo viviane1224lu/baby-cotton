@@ -204,7 +204,7 @@ body:has(#card:not([hidden])) #sayBox{z-index:9}
       <button class="m2" id="mStory"><span class="big">🗺️</span>故事冒險<small>關卡遊戲</small></button>
       <button class="m3" id="mBook"><span class="big">⭐</span>成長紀錄<small>學會的字</small></button>
       <button class="m4" id="mPaint"><span class="big">🎨</span>魔法畫室<small>畫畫、上色</small></button>
-      <button class="m5" id="mBag"><span class="big">🎒</span>寶物背包<small>寶物和鑽石</small></button>
+      <button class="m5" id="mBag"><span class="big">👝</span>空間袋<small>寶物和鑽石</small></button>
     </div>
   </div></div>
 
@@ -249,8 +249,8 @@ body:has(#card:not([hidden])) #sayBox{z-index:9}
   <div class="overlay" id="paintPick" hidden><div class="panel"><h2 id="paintTitle">魔法畫室</h2><div class="sub" id="paintSub">想畫在哪裡？</div><div class="rooms" id="paintList"></div><button class="go" data-close>回首頁</button></div></div>
   <div id="paintBar" hidden></div>
   <div class="overlay" id="bookPanel" hidden><div class="panel"><h2 id="bookTitle">成長紀錄</h2><div class="sub" id="bookSub"></div><div class="book" id="bookList"></div><button class="go" data-close>回首頁</button></div></div>
-  <div class="overlay" id="bagPanel" hidden><div class="panel"><h2 id="bagTitle">寶物背包</h2><div class="sub" id="bagSub"></div><div class="bag" id="bagList"></div><button class="go" data-close>回首頁</button></div></div>
-  <div class="overlay" id="treasure" hidden><div class="panel"><div class="trBig" id="trIcon"></div><h2 id="trTitle"></h2><div class="sub" id="trSub"></div><button class="go" id="trBtn">放進背包 🎒</button></div></div>
+  <div class="overlay" id="bagPanel" hidden><div class="panel"><h2 id="bagTitle">空間袋</h2><div class="sub" id="bagSub"></div><div class="bag" id="bagList"></div><button class="go" data-close>回首頁</button></div></div>
+  <div class="overlay" id="treasure" hidden><div class="panel"><div class="trBig" id="trIcon"></div><h2 id="trTitle"></h2><div class="sub" id="trSub"></div><button class="go" id="trBtn">放進空間袋 👝</button></div></div>
   <div class="overlay" id="vidPanel" hidden><div class="panel"><video id="vid" controls playsinline></video><button class="go" id="vidBtn">回去玩 ▶</button></div></div>
   <div class="overlay" id="done" hidden><div class="panel"><img class="hero" id="doneHero" alt="棉花"><h2 id="doneTitle"></h2><div class="sub" id="doneSub"></div><button class="go" id="doneBtn">回首頁</button></div></div>
 </div>
@@ -373,8 +373,8 @@ function applyLangUI(){ const L=LANG();
   $("mStory").innerHTML=`<span class="big">🗺️</span>${T3("故事冒險","Story")}<small>${T3("關卡遊戲","Adventure")}</small>`;
   $("mBook").innerHTML=`<span class="big">⭐</span>${T3("成長紀錄","My Words")}<small>${T3("學會的字","What I learned")}</small>`;
   $("mPaint").innerHTML=`<span class="big">🎨</span>${T3("魔法畫室","Magic Studio")}<small>${T3("畫畫、上色","Draw & color")}</small>`;
-  $("mBag").innerHTML=`<span class="big">🎒</span>${T3("寶物背包","Backpack")}<small>${T3("寶物和鑽石","Treasures")}</small>`;
-  $("bagTitle").textContent=T3("寶物背包","Treasure Backpack"); $("trBtn").textContent=T3("放進背包 🎒","Into my backpack 🎒"); $("vidBtn").textContent=T3("回去玩 ▶","Keep playing ▶");
+  $("mBag").innerHTML=`<span class="big">👝</span>${T3("空間袋","Magic Pouch")}<small>${T3("寶物和鑽石","Treasures")}</small>`;
+  $("bagTitle").textContent=T3("棉花的空間袋","Cotton's Magic Pouch"); $("trBtn").textContent=T3("放進空間袋 👝","Into the magic pouch 👝"); $("vidBtn").textContent=T3("回去玩 ▶","Keep playing ▶");
   $("freeTitle").textContent=T3("棉花的家","Cotton's Home"); $("freeSub").textContent=T3("想去哪個房間玩？","Which room do you want to play in?");
   document.querySelectorAll("[data-close]").forEach(b=>b.textContent=T3("回首頁","Home")); $("doneBtn").textContent=T3("回首頁","Home");
   $("paintTitle").textContent=T3("魔法畫室","Magic Studio"); $("paintSub").textContent=T3("想畫在哪裡？","Where do you want to draw?");
@@ -642,7 +642,7 @@ function cast(who){ const r=ROLES.find(x=>x[0]===who)||ROLES[2], v=(ME.voices||{
 // Keep each pack compressed (ADTS AAC) and decode only the sentence being spoken.
 const IDX_CACHE={}, CLIP_CACHE=new Map(), PRIME=2112, SR=24000;
 // AV changes whenever the recordings change (set by sync_site.sh), so a phone never mixes an old sound file with a new index
-const AV="c6ca602e", AQ=AV?"?v="+AV:"";
+const AV="3679b5f3", AQ=AV?"?v="+AV:"";
 function loadIdx(pack){ return IDX_CACHE[pack]||(IDX_CACHE[pack]=fetch(`audio/${pack}.json${AQ}`).then(r=>r.json()).catch(()=>{ delete IDX_CACHE[pack]; return null; })); }
 // Read the AAC packets straight out of the .mp4 (sample tables) and rebuild a tiny ADTS stream per sentence.
 function mp4Frames(d){ const v=new DataView(d.buffer,d.byteOffset,d.byteLength), u32=o=>v.getUint32(o);
